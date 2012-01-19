@@ -5,15 +5,19 @@
  * Licenced under the BSD License.
  * See https://raw.github.com/RobertWHurst/Origin/master/license.txt
  */
-(function (factory) {
+(function (root, factory) {
 
 	if(typeof define === 'function' && define.amd) {
 		define(factory);
 	} else {
-		window.Origin = factory();
+		root.Origin = factory();
 	}
 
-})(function() {
+})(this, function() {
+
+	//polyfills for ms's peice o' shit browsers
+	function bind(target, type, handler) { if (target.addEventListener) { target.addEventListener(type, handler, false); } else { target.attachEvent("on" + type, function(event) { return handler.call(target, event); }); } }
+	[].indexOf||(Array.prototype.indexOf=function(a,b,c){for(c=this.length,b=(c+~~b)%c;b<c&&(!(b in this)||this[b]!==a);b++);return b^c?b:-1;});
 
 	//vars
 	var routes = {};
@@ -21,12 +25,13 @@
 	var url404 = '/404';
 
 	//bind to the has change event
-	$(window).on('hashchange', handleCurrentRoute);
+	bind(window, 'hashchange', handleCurrentRoute);
 
 	/**
 	 * Reads the location hash and tries to find a follow a matching route
 	 */
 	function handleCurrentRoute() {
+		var result;
 
 		//add the hash if it doesn't exist
 		if (!location.hash) {
@@ -44,16 +49,24 @@
 		//if we get the page then follow it
 		if(route) {
 			for(var i = 0; i < route.callbacks.length; i += 1) {
-				route.callbacks[i](uris, route.data);
+				var returned = route.callbacks[i](uris, route.data);
+				if(!returned) {
+					result = returned;
+				}
 			}
 		}
 
 		//fire the exit callback
 		if(currentRoute) {
 			for(var i = 0; i < currentRoute.exitCallbacks.length; i += 1) {
-				currentRoute.exitCallbacks[i](uris, currentRoute.data);
+				var returned = currentRoute.exitCallbacks[i](uris, currentRoute.data);
+				if(!returned) {
+					result = returned;
+				}
 			}
 		}
+
+		return result;
 	}
 
 	/**
