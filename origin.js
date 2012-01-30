@@ -20,9 +20,9 @@
 	[].indexOf||(Array.prototype.indexOf=function(a,b,c){for(c=this.length,b=(c+~~b)%c;b<c&&(!(b in this)||this[b]!==a);b++);return b^c?b:-1;});
 
 	//vars
-	var routes = {};
-	var currentRoute = false;
-	var url404 = '/404';
+	var routes = {},
+		currentRoute = false;
+		url404 = '/404';
 
 	//bind to the has change event
 	bind(window, 'hashchange', handleCurrentRoute);
@@ -31,7 +31,7 @@
 	 * Reads the location hash and tries to find a follow a matching route
 	 */
 	function handleCurrentRoute() {
-		var result;
+		var result, uris, route, returned;
 
 		//add the hash if it doesn't exist
 		if (!location.hash) {
@@ -40,8 +40,8 @@
 		}
 
 		//get the route
-		var uris = urlToUris(location.hash.substr(1));
-		var route = getRoute(location.hash.substr(1));
+		uris = urlToUris(location.hash.substr(1));
+		route = getRoute(location.hash.substr(1));
 
 		//get the 404 page
 		//if(!route) { route = getRoute(url404); }
@@ -49,7 +49,7 @@
 		//if we get the page then follow it
 		if(route) {
 			for(var i = 0; i < route.callbacks.length; i += 1) {
-				var returned = route.callbacks[i](uris, route.data);
+				returned = route.callbacks[i](uris, route.data);
 				if(!returned) {
 					result = returned;
 				}
@@ -59,12 +59,15 @@
 		//fire the exit callback
 		if(currentRoute) {
 			for(var i = 0; i < currentRoute.exitCallbacks.length; i += 1) {
-				var returned = currentRoute.exitCallbacks[i](uris, currentRoute.data);
+				returned = currentRoute.exitCallbacks[i](uris, currentRoute.data);
 				if(!returned) {
 					result = returned;
 				}
 			}
 		}
+
+		//save the route as the current route
+		currentRoute = route;
 
 		return result;
 	}
@@ -74,8 +77,8 @@
 	 * @param url
 	 */
 	function urlToUris(url) {
-		var rawUris = url.split('/');
-		var uris = [];
+		var rawUris = url.split('/'),
+			uris = [];
 
 		//loop through the uris
 		for(var uI = 0; uI < rawUris.length; uI += 1) {
@@ -112,9 +115,18 @@
 		if(!url) { return false; }
 
 		//explode the target url
-		var targetUris = urlToUris(url);
-		var matchedRoute = false;
-		var sortedRoutes = [];
+		var targetUris = urlToUris(url),
+			matchedRoute = false,
+			sortedRoutes = [],
+			routeGroup,
+			route,
+			matchedUri,
+			routeUris,
+			targetUri,
+			routeUri,
+			routeData,
+			key,
+			value;
 
 		//loop through each route group
 		for(var rGK in routes) {
@@ -123,16 +135,16 @@
 		}
 
 		for(var sRGI = 0; sRGI < sortedRoutes.length; sRGI += 1) {
-			var routeGroup = sortedRoutes[sRGI];
+			routeGroup = sortedRoutes[sRGI];
 
 			//loop through each route
 			for(var rI = 0; rI < routeGroup.length; rI += 1) {
-				var route = routeGroup[rI];
-				var matchedUri = false;
-				var routeData = {};
+				route = routeGroup[rI];
+				matchedUri = false;
+				routeData = {};
 
 				//explode the route url
-				var routeUris = urlToUris(route.url);
+				routeUris = urlToUris(route.url);
 
 				//handle the case for root
 				if(targetUris.length === 0 && routeUris.length === 0) {
@@ -141,8 +153,8 @@
 
 				//loop through the target uris and check for a match
 				for(var rUI = 0; rUI < routeUris.length; rUI += 1) {
-					var targetUri = targetUris[rUI];
-					var routeUri = routeUris[rUI];
+					targetUri = targetUris[rUI];
+					routeUri = routeUris[rUI];
 
 					//if ether the target or the route doesn't have this uri then break
 					if(!targetUri || !routeUri) {
@@ -165,10 +177,10 @@
 					else if(routeUri.substr(0, 1) === ':') {
 
 						//get the key
-						var key = routeUri.substr(1);
+						key = routeUri.substr(1);
 
 						//get the value
-						var value = targetUri;
+						value = targetUri;
 
 						//make sure both the key and the value are real
 						if(key.length && value.length) {
@@ -263,7 +275,7 @@
 				"exitCallbacks": []
 			};
 
-			if(exitCallback) { route.exitCallbacks.push(exitCallbacks); }
+			if(exitCallback) { route.exitCallbacks.push(exitCallback); }
 			routes[uris.length].push(route);
 		}
 	}
