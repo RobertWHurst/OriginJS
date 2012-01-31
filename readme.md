@@ -128,8 +128,8 @@ The `Origin.update` method should never need to be called, however in the event 
 your application looses focus on a hash change event, calling this function will force Origin to re check the hash and
 execute matching routes.
 
-Disclaimer
-==========
+Credits
+-------
 
 I (Robert Hurst) made this to enable me to build more robust applications without wasting time creating a half baked 
 router. I'd like to share it with fellow devs. Feel free to fork this project and make your own changes.
