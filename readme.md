@@ -5,6 +5,9 @@ Every route begins at the origin.
 Getting Started
 ===============
 
+First include origin.js in your page. You can do this with a script tag in the head of your page, or you can 
+load it with [require.js](http://requirejs.org/).
+
 Using Origin is very easy. Here's a very basic example.
 
 	Origin.bind('/', function() {
