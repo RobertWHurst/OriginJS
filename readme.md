@@ -25,6 +25,9 @@ Using Origin is very easy. Here's a very basic example.
 		//loaded on /#/about
 
 	});
+	
+	//instruct the router to try and find then follow a route now that routes above have been added
+	Origin.update()
 
 Your links would look like this.
 
