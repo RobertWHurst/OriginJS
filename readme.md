@@ -126,9 +126,8 @@ Update
 
 	Origin.update();
 
-The `Origin.update` method should never need to be called, however in the event that something weird happens, for example
-your application looses focus on a hash change event, calling this function will force Origin to re check the hash and
-execute matching routes.
+The `Origin.update` method is used to trigger force Origin to match the current hash url routes are defined. You should
+call this after your routes are binded in your appication. You should only need to to call this function once.
 
 Credits
 =======
