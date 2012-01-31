@@ -129,7 +129,7 @@ your application looses focus on a hash change event, calling this function will
 execute matching routes.
 
 Credits
--------
+=======
 
 I (Robert Hurst) made this to enable me to build more robust applications without wasting time creating a half baked 
 router. I'd like to share it with fellow devs. Feel free to fork this project and make your own changes.
