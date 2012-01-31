@@ -127,3 +127,11 @@ it will open the url in a new tab (or window).
 The `Origin.update` method should never need to be called, however in the event that something weird happens, for example
 your application looses focus on a hash change event, calling this function will force Origin to re check the hash and
 execute matching routes.
+
+Disclaimer
+==========
+
+I (Robert Hurst) made this to enable me to build more robust applications without wasting time creating a half baked 
+router. I'd like to share it with fellow devs. Feel free to fork this project and make your own changes.
+
+[![endorse](http://api.coderwall.com/robertwhurst/endorsecount.png)](http://coderwall.com/robertwhurst)
