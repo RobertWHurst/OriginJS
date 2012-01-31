@@ -88,17 +88,15 @@ about it. Its predictable and yet feels magical. The choice is yours but I would
 Documentation
 =============
 
-Methods
--------
-
-### Bind
+Bind
+----
 
     Origin.bind(route, entryCallback[, exitCallback]);
 
 This method is the corner stone of this library. It binds your route logic to the routes of your application.
 
 
-#### Arguments
+### Arguments
 
 `route`: The route you wish to bind. The route can contain dynamic uris such as `*`, `+`, or `:someIdHere`.
 `entryCallback`: The callback that will be executed when you route has been followed.
@@ -107,20 +105,22 @@ This method is the corner stone of this library. It binds your route logic to th
 Both the entry callback and the exit callback are passed two arguments; the uris from the hash url, and an object with
 data from any `:someIdHere`s you may have in your route.
 
-### Go
+Go
+--
 
 	Origin.go(url);
 
 At some point you may want to trigger routes or open other pages programatically. This is what `Origin.go(url)` is for.
 If `Origin.bind` is ying, `Origin.go` is yang.
 
-#### Arguments
+### Arguments
 
 `url`: Any url you wish to follow. If the url is pointing to a binded route the router will load that route. No need to
 prefix with `/#`. If the url is not pointing to a binded route it will redirect to the url. If the url contains a domain
 it will open the url in a new tab (or window).
 
-### Update
+Update
+------
 
 	Origin.update();
 
