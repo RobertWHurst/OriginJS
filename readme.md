@@ -8,8 +8,6 @@ Getting Started
 First include origin.js in your page. You can do this with a script tag in the head of your page, or you can 
 load it with [require.js](http://requirejs.org/).
 
-There is also a [video introduction](http://youtu.be/V-b9IEYbkIw) for those would like to watch [it](http://youtu.be/V-b9IEYbkIw).
-
 Using Origin is very easy. Here's a very basic example.
 
 	Origin.bind('/', function() {
