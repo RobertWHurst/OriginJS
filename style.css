@@ -1,0 +1,108 @@
+html {
+  background: #fff;
+  width: 100%;
+  height: 100%;
+  font-family: OstrichSansRegular;
+}
+body {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+}
+.accent {
+  color: #ff7200;
+}
+a {
+  text-decoration: none;
+  color: #000;
+}
+a:hover {
+  color: #ff7200;
+}
+nav {
+  position: absolute;
+  opacity: 0;
+  left: -9999px;
+  left: -9999px;
+  z-index: 999;
+  font-size: 48px;
+  text-transform: uppercase;
+  font-family: OstrichSansBlack;
+  -webkit-transition: all 800ms ease-in-out;
+}
+nav:after {
+  content: ".";
+  display: block;
+  visibility: hidden;
+  height: 0;
+  clear: both;
+}
+nav a {
+  display: block;
+  float: left;
+  padding: 20px;
+}
+.wrapper {
+  opacity: 0;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.panel {
+  position: absolute;
+  display: block;
+  background: url("images/background-logo.png") no-repeat;
+  width: 400px;
+  height: 161px;
+  left: -9999px;
+  left: -9999px;
+  -webkit-transition: all 800ms ease-in-out;
+}
+.panel .title {
+  position: absolute;
+  font-size: 72px;
+  font-family: OstrichSansBold;
+}
+.panel .home {
+  position: absolute;
+  width: 960px;
+  height: 768px;
+  bottom: 0;
+}
+.panel .home .catchline {
+  font-size: 90px;
+  line-height: 60px;
+  font-family: OstrichSansDashed;
+  color: #000;
+  text-align: center;
+}
+.panel .about {
+  position: absolute;
+  right: 0;
+}
+.panel .about .title {
+  top: 100px;
+  left: 0;
+}
+.panel .about .content {
+  position: absolute;
+  font-family: Helvetica, Arial, sans-serif;
+  top: 200px;
+  width: 30%;
+  left: 0;
+  font-size: 18px;
+}
+.panel .docs {
+  position: absolute;
+  -webkit-transform: rotateZ(45deg);
+  -webkit-transform-origin: 0 0;
+  top: -120px;
+  left: 180px;
+  height: 10000px;
+}
+.panel .docs .title {
+  top: 0;
+  right: 0;
+}
