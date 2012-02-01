@@ -1,6 +1,6 @@
 OriginJS
 ========
-Every route begins at the origin.
+Every route begins with an origin.
 
 Getting Started
 ===============
