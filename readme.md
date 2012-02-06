@@ -1,9 +1,12 @@
 OriginJS
 ========
-Every route begins at the origin.
+Every route begins with an origin.
 
 Getting Started
 ===============
+
+First include origin.js in your page. You can do this with a script tag in the head of your page, or you can 
+load it with [require.js](http://requirejs.org/).
 
 Using Origin is very easy. Here's a very basic example.
 
@@ -20,6 +23,9 @@ Using Origin is very easy. Here's a very basic example.
 		//loaded on /#/about
 
 	});
+	
+	//instruct the router to try and find then follow a route now that routes above have been added
+	Origin.update()
 
 Your links would look like this.
 
@@ -85,17 +91,15 @@ about it. Its predictable and yet feels magical. The choice is yours but I would
 Documentation
 =============
 
-Methods
--------
-
-### Bind
+Bind
+----
 
     Origin.bind(route, entryCallback[, exitCallback]);
 
 This method is the corner stone of this library. It binds your route logic to the routes of your application.
 
 
-#### Arguments
+### Arguments
 
 `route`: The route you wish to bind. The route can contain dynamic uris such as `*`, `+`, or `:someIdHere`.
 `entryCallback`: The callback that will be executed when you route has been followed.
@@ -104,23 +108,32 @@ This method is the corner stone of this library. It binds your route logic to th
 Both the entry callback and the exit callback are passed two arguments; the uris from the hash url, and an object with
 data from any `:someIdHere`s you may have in your route.
 
-### Go
+Go
+--
 
 	Origin.go(url);
 
 At some point you may want to trigger routes or open other pages programatically. This is what `Origin.go(url)` is for.
 If `Origin.bind` is ying, `Origin.go` is yang.
 
-#### Arguments
+### Arguments
 
 `url`: Any url you wish to follow. If the url is pointing to a binded route the router will load that route. No need to
 prefix with `/#`. If the url is not pointing to a binded route it will redirect to the url. If the url contains a domain
 it will open the url in a new tab (or window).
 
-### Update
+Update
+------
 
 	Origin.update();
 
-The `Origin.update` method should never need to be called, however in the event that something weird happens, for example
-your application looses focus on a hash change event, calling this function will force Origin to re check the hash and
-execute matching routes.
+The `Origin.update` method is used to trigger force Origin to match the current hash url routes are defined. You should
+call this after your routes are binded in your appication. You should only need to to call this function once.
+
+Credits
+=======
+
+I (Robert Hurst) made this to enable me to build more robust applications without wasting time creating a half baked 
+router. I'd like to share it with fellow devs. Feel free to fork this project and make your own changes.
+
+[![endorse](http://api.coderwall.com/robertwhurst/endorsecount.png)](http://coderwall.com/robertwhurst)
