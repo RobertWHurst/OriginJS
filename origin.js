@@ -1,75 +1,122 @@
-/*!
- * Origin
- *
- * Copyright 2011, Robert William Hurst
- * Licenced under the BSD License.
- * See https://raw.github.com/RobertWHurst/Origin/master/license.txt
- */
-(function (root, factory) {
+(function(factory) {
 
 	if(typeof define === 'function' && define.amd) {
 		define(factory);
 	} else {
-		root.Origin = factory();
+		window.OriginJS = factory();
 	}
 
-})(this, function() {
+})(function() {
 
-	//polyfills for ms's peice o' shit browsers
-	function bind(target, type, handler) { if (target.addEventListener) { target.addEventListener(type, handler, false); } else { target.attachEvent("on" + type, function(event) { return handler.call(target, event); }); } }
+	//abstractions because of ms's piece o' shit browsers
+	function bind(eventName, element, callback) {if(element.addEventListener){element.addEventListener(eventName,callback,false);}else{element.attachEvent("on"+eventName,function(event){return callback.call(element,event);});}}
+	function trigger(eventName, element) {var a;if(document.createEvent){a=document.createEvent("HTMLEvents");a.initEvent(eventName,true,true);}else{a=document.createEventObject();a.eventType=eventName;}if(document.createEvent){element.dispatchEvent(a);}else{element.fireEvent(a.eventType,a);}}
+
+	//polyfills for ms's piece o' shit browsers
 	[].indexOf||(Array.prototype.indexOf=function(a,b,c){for(c=this.length,b=(c+~~b)%c;b<c&&(!(b in this)||this[b]!==a);b++);return b^c?b:-1;});
+	typeof window.onhashchange!=='undefined'||(function(){var a=location.hash;setInterval(function(){if(a!==location.hash){trigger('hashchange',window);a=location.hash;}},10);})();
 
 	//vars
-	var routes = {},
-		currentRoute = false;
-		url404 = '/404';
+	var routes = [],
+		lastRouteData = false,
+		inReset = false,
+		pointers;
+
+	pointers = [];
 
 	//bind to the has change event
-	bind(window, 'hashchange', handleCurrentRoute);
+	bind('hashchange', window, handleCurrentRoute);
 
 	/**
 	 * Reads the location hash and tries to find a follow a matching route
 	 */
 	function handleCurrentRoute() {
-		var result, uris, route, returned;
+		var url, routeData, lRCI, rCI;
 
 		//add the hash if it doesn't exist
 		if (!location.hash) {
 			location.hash = '/';
-			return;
+			return false;
 		}
+
+		if(inReset) {
+			inReset = false;
+			return false;
+		}
+
+		//trace pointers if any
+		url = tracePointers(location.hash.substr(1));
 
 		//get the route
-		uris = urlToUris(location.hash.substr(1));
-		route = getRoute(location.hash.substr(1));
+		routeData = getRoute(url);
 
-		//get the 404 page
-		//if(!route) { route = getRoute(url404); }
+		//if the route is invalid then reset the hash if possible
+		if(!routeData) {
+			if(lastRouteData) {
+				inReset = true;
+				location.hash = '/' + lastRouteData.uriData.join('/');
+			}
+			return false;
+		}
 
-		//if we get the page then follow it
-		if(route) {
-			for(var i = 0; i < route.callbacks.length; i += 1) {
-				returned = route.callbacks[i](uris, route.data);
-				if(!returned) {
-					result = returned;
-				}
+		//execute exit callbacks
+		if(lastRouteData) {
+			for(lRCI = 0; lRCI < lastRouteData.route.tearDownCallbacks.length; lRCI += 1) {
+				lastRouteData.route.tearDownCallbacks[lRCI](routeData.uriData, lastRouteData.uriData);
 			}
 		}
 
-		//fire the exit callback
-		if(currentRoute) {
-			for(var i = 0; i < currentRoute.exitCallbacks.length; i += 1) {
-				returned = currentRoute.exitCallbacks[i](uris, currentRoute.data);
-				if(!returned) {
-					result = returned;
-				}
-			}
+		//execute setup callbacks
+		for(rCI = 0; rCI < routeData.route.setupCallbacks.length; rCI += 1) {
+			routeData.route.setupCallbacks[rCI](routeData.uriData, lastRouteData.uriData);
 		}
 
-		//save the route as the current route
-		currentRoute = route;
+		//save the route as the last route
+		lastRouteData = routeData;
 
-		return result;
+		return true;
+
+		/**
+		 * Traces a pointer chain all the way to the end.
+		 * NOTE: this will change the hash url if it finds a redirect pointer
+		 * @param url
+		 */
+		function tracePointers(url) {
+			var pointerDepth;
+
+			pointerDepth = 0;
+
+			//contain recursion inside a closure
+			return (function exec(url) {
+				var pointer;
+
+				//try and get a matching pointer
+				pointer = getPointer(url);
+
+				//if we have a pointer
+				if(pointer) {
+
+					//iterate the depth
+					pointerDepth += 1;
+
+					//make sure the pointer depth is less than one hundred
+					if(pointerDepth > 100) { throw new Error('Origin cannot follow "' + url + '" because it has no end point. Check your pointers for loops.') }
+
+					//redirect hash url if pointer is a redirect
+					if(pointer.type === 'redirect') {
+						inReset = true;
+						location.hash = pointer.url;
+					}
+
+					//try to trace the pointer's url and if that fails return the pointer url
+					return exec(pointer.url) || pointer.url;
+
+				} else {
+					return url;
+				}
+				
+			})(url);
+		}
 	}
 
 	/**
@@ -77,11 +124,14 @@
 	 * @param url
 	 */
 	function urlToUris(url) {
-		var rawUris = url.split('/'),
-			uris = [];
+		var rawUris, uris, uI;
+
+		if(typeof url !== 'string') { throw new Error('Cannot convert url to uris. Requires a valid url string.'); }
+		rawUris = url.split('/');
+		uris = [];
 
 		//loop through the uris
-		for(var uI = 0; uI < rawUris.length; uI += 1) {
+		for(uI = 0; uI < rawUris.length; uI += 1) {
 			if(rawUris[uI]) { uris.push(rawUris[uI]); }
 		}
 
@@ -93,6 +143,7 @@
 	 * @param uris
 	 */
 	function urisToUrl(uris) {
+		if(typeof uris !== 'object' && typeof uris.push === 'function') { throw new Error('Cannot convert uris to url. Requires a valid uris array.'); }
 		return '/' + uris.join('/');
 	}
 
@@ -101,132 +152,144 @@
 	 * @param url
 	 */
 	function cleanUrl(url) {
+
+		//convert the url into an array of uris and back again to normalize the url.
 		return urisToUrl(urlToUris(url));
 	}
 
 	/**
-	 * Finds a route that a target url matches then returns the route with dynamic data attached
+	 * Finds a route that a target url matches then returns the route and uri data
 	 * @param url
 	 */
 	function getRoute(url) {
+		var matchedRoute, sortedRoutes, rGI, sRGI,
+			routeGroup, route, uriData, result,
+			lastRouteScore, key;
+
+		//validate the arguments
+		if(typeof url !== 'string') { throw new Error('Cannot get route. Requires a valid route.'); }
 
 		//clean the url
 		url = cleanUrl(url);
-		if(!url) { return false; }
 
-		//explode the target url
-		var targetUris = urlToUris(url),
-			matchedRoute = false,
-			sortedRoutes = [],
-			routeGroup,
-			route,
-			matchedUri,
-			routeUris,
-			targetUri,
-			routeUri,
-			routeData,
-			key,
-			value;
+		//convert the url to uris
+		uriData = urlToUris(url);
 
-		//loop through each route group
-		for(var rGK in routes) {
-			if(!routes.hasOwnProperty(rGK)) { continue; }
-			sortedRoutes.unshift(routes[rGK]);
+		//flip the order of the routes object so its longest to shortest and filter out routes that are
+		// longer than the target
+		sortedRoutes = [];
+		for(rGI = 0; rGI < routes.length; rGI += 1) {
+			if(!routes[rGI]) { continue; }
+			if(rGI > uriData.length) { break; }
+			sortedRoutes.unshift(routes[rGI]);
 		}
 
-		for(var sRGI = 0; sRGI < sortedRoutes.length; sRGI += 1) {
+		//setup the setup the loop initial state of the loop variables
+		matchedRoute = false;
+		lastRouteScore = 0;
+
+		//loop through each of the route groups
+		for(sRGI = 0; sRGI < sortedRoutes.length; sRGI += 1) {
+
+			//grab the group
 			routeGroup = sortedRoutes[sRGI];
 
-			//loop through each route
-			for(var rI = 0; rI < routeGroup.length; rI += 1) {
+			//loop through each route in the current group
+			for(rI = 0; rI < routeGroup.length; rI += 1) {
+
+				//grab the route
 				route = routeGroup[rI];
-				matchedUri = false;
-				routeData = {};
 
-				//explode the route url
-				routeUris = urlToUris(route.url);
+				//compare the route url to the target url
+				result = compareUrls(url, route.url);
 
-				//handle the case for root
-				if(targetUris.length === 0 && routeUris.length === 0) {
-					matchedUri = true;
+				//attach data to the UriData array
+				for(key in result.data) {
+					if(!result.data.hasOwnProperty(key)) { continue; }
+					uriData[key] = result.data[key];
 				}
 
-				//loop through the target uris and check for a match
-				for(var rUI = 0; rUI < routeUris.length; rUI += 1) {
-					targetUri = targetUris[rUI];
-					routeUri = routeUris[rUI];
-
-					//if ether the target or the route doesn't have this uri then break
-					if(!targetUri || !routeUri) {
-
-						matchedUri = false;
-						break;
-					}
-
-					//compare the target uri to the route uri
-
-					//if a direct match
-					if(routeUri === targetUri) {
-
-						//declare a match
-						matchedUri = true;
-
-					}
-
-					//if a dynamic uri
-					else if(routeUri.substr(0, 1) === ':') {
-
-						//get the key
-						key = routeUri.substr(1);
-
-						//get the value
-						value = targetUri;
-
-						//make sure both the key and the value are real
-						if(key.length && value.length) {
-
-							//save the data to the uriData object
-							routeData[key] = value;
-
-							//declare a match
-							matchedUri = true;
-						}
-
-					}
-
-					//if wild uri segment
-					else if(routeUri === '*') {
-
-						//make sure the target uri has content
-						if(targetUri) {
-							//declare a match
-							matchedUri = true;
-						}
-
-					}
-
-					//if catch-all
-					else if(routeUri === '+') {
-
-						//declare a match and exit the uri loop
-						matchedUri = true;
-						break;
-
-
-					//if the uri is unmatched
-					} else {
-						matchedUri = false;
-						break;
-					}
-					if(!matchedUri) { break; }
+				if(result.score > lastRouteScore) {
+					lastRouteScore = result.score;
+					matchedRoute = route;
 				}
-				if(matchedUri) { matchedRoute = route; matchedRoute.data = routeData; }
 			}
-			if(matchedRoute) { break; }
 		}
 
+		//return false if no route was returned
+		if(!matchedRoute) { return false; }
+
 		//return the matched route
-		return matchedRoute;
+		return {
+			"route": matchedRoute,
+			"uriData": uriData
+		};
+	}
+
+	//MODEL     (target)    /cake/test
+	//SUBJECT   (route)     /cake/:test
+
+	function compareUrls(modelUrl, subjectUrl) {
+		var modelUris, subjectUris, score, tUI, subjectUri, modelUri, data;
+
+		modelUris = urlToUris(modelUrl);
+		subjectUris = urlToUris(subjectUrl);
+		score = 0;
+		data = {};
+
+		//handle root
+		if(modelUris.length === 0 && subjectUris.length === 0) {
+			score = 1;
+		}
+
+		//loop through the target uris and compare to the route urls counter part.
+		for(tUI = 0; tUI < modelUris.length; tUI += 1) {
+
+			//get both the route and the target uri
+			subjectUri = subjectUris[tUI];
+			modelUri = modelUris[tUI];
+
+			//if the route doesn't have a corresponding uri then break out of the loop and check the next route
+			if(!subjectUri) {
+				score = 0;
+				break;
+			}
+
+			//direct uri match
+			if(subjectUri === modelUri) {
+				score += 1000;
+			}
+
+			//if dynamic uri match
+			else if(subjectUri.substr(0, 1) === ':') {
+				score += 100;
+
+				//save the route uri as the key and the target uri as the value for the callback
+				data[subjectUri.substr(1)] = modelUri;
+			}
+
+			//if wild card uri match
+			else if(subjectUri === '*') {
+				score += 10;
+			}
+
+			//if catch all
+			else if(subjectUri === '+') {
+				score += 1;
+				break;
+			}
+
+			//if there is no match at all
+			else {
+				score = 0;
+				break;
+			}
+		}
+
+		return {
+			"score": score,
+			"data": data
+		}
 	}
 
 	/**
@@ -234,53 +297,271 @@
 	 * An optional second callback can be passed that is executed when a
 	 * different route is triggered. This is useful for doing cleanup.
 	 * @param url
-	 * @param enterCallback
-	 * @param exitCallback
+	 * @param setupCallbacks
+	 * @param tearDownCallbacks (optional)
 	 */
-	function bindRoute(url, enterCallback, exitCallback) {
+	function bindRoute(url, setupCallbacks, tearDownCallbacks) {
+		var matchedRoute, rGK, rI, enI, exI, uris, route;
+
+		if(typeof setupCallbacks === 'function') { setupCallbacks = [setupCallbacks]; }
+		if(typeof tearDownCallbacks === 'function') { tearDownCallbacks = [tearDownCallbacks]; }
+
+		setupCallbacks = setupCallbacks || [];
+		tearDownCallbacks = tearDownCallbacks || [];
 
 		//make sure the url and callback is defined
-		if(typeof url !== 'string' || typeof enterCallback !== 'function') {
-			return false;
+		if(typeof url !== 'string') {
+			throw new Error('Cannot bind route. Requires a valid route url string.');
+		}
+		if(typeof setupCallbacks[0] !== 'function') {
+			throw new Error('Cannot bind route. Requires a valid setup callback function.');
 		}
 
 		//clean the url
-		var url = cleanUrl(url);
-		if(!url) { return false; }
+		url = cleanUrl(url);
 
-		//try and get the route if it exists
-		var matchedRoute = false;
-		for(var rGK in routes) {
-			for(var rI = 0; rI < routes[rGK].length; rI += 1) {
-				if(routes[rGK][rI].url === url) {
-					matchedRoute = routes[rGK][rI];
+		//if the url string is empty after being clean, asumen it was invalid and throw an exception
+		if(!url) { throw new Error('Url '); }
+
+		//try and get the route if it already exists
+		matchedRoute = false;
+		for(rGK in routes) {
+			if(routes.hasOwnProperty(rGK)) {
+				for(rI = 0; rI < routes[rGK].length; rI += 1) {
+					if(routes[rGK][rI].url === url) {
+						matchedRoute = routes[rGK][rI];
+					}
 				}
 			}
 		}
 
+		//if an existing route has been setup already then add the new callbacks to it
 		if(matchedRoute) {
 
-			matchedRoute.callbacks.push(enterCallback);
-			if(exitCallback) { matchedRoute.exitCallbacks.push(exitCallbacks); }
+			//add the setup callbacks
+			for(enI = 0; enI < setupCallbacks.length; enI += 1) {
+				matchedRoute.setupCallbacks.push(setupCallbacks[enI]);
+			}
+			//add the tear down
+			for(exI = 0; exI < tearDownCallbacks.length; exI += 1) {
+				matchedRoute.tearDownCallbacks.push(tearDownCallbacks[exI]);
+			}
 
+		//if no existing route has benn setup then create a new route
 		} else {
 
-			var uris = urlToUris(url);
+			//pull out the route's uris
+			uris = urlToUris(url);
 
+			//if the routes object does not already have a route group for this number of uris then create it
 			if(!routes[uris.length]) { routes[uris.length] = []; }
 
-			var route = {
+			//create the route
+			route = {
 				"url": url,
-				"callbacks": [enterCallback],
-				"exitCallbacks": []
+				"setupCallbacks": setupCallbacks,
+				"tearDownCallbacks": tearDownCallbacks
 			};
 
-			if(exitCallback) { route.exitCallbacks.push(exitCallback); }
 			routes[uris.length].push(route);
+		}
+
+		return true;
+	}
+
+	/**
+	 * Takes any number of urls and returns two methods, at() which takes the urls and sets them up as aliases and to()
+	 * which makes the urls redirect to another url.
+	 */
+	function createPointer(    ) {
+		var pointerUrls, isSet;
+
+
+		//gets all the source urls
+		pointerUrls = Array.prototype.slice.apply(arguments);
+
+		isSet = false;
+
+		return { "at": createAlias, "to": createRedirect };
+
+		//set an alias
+		function createAlias(targetUrl) {
+			create(targetUrl, "alias");
+		}
+
+		//sets a redirect
+		function createRedirect(targetUrl) {
+			create(targetUrl, "redirect");
+		}
+
+		function create(targetUrl, type) {
+			if(isSet) {
+				throw new Error('Pointers already set.');
+			}
+
+			//throws error if the pointer is invalid
+			validate(pointerUrls, targetUrl);
+
+			pointers.push({
+				"targetUrl": targetUrl,
+				"pointerUrls": pointerUrls,
+				"type": type
+			});
+			isSet = true;
+		}
+
+		function validate(pointerUrls, targetUrl) {
+			var targetUris, tUI, targetUri, targetDynamicUrls, pUlI, pointerUris, pUiI, pointerUri, dTUI, expectedUris, number;
+
+			if(typeof pointerUrls === 'string') {
+				pointerUrls = [pointerUrls];
+			}
+
+			//get the target uris
+			targetUris = urlToUris(targetUrl);
+
+			targetDynamicUrls = [];
+			expectedUris = 0;
+
+			//loop through the target uris
+			for(tUI = 0; tUI < targetUris.length; tUI += 1) {
+
+				//get the target uri
+				targetUri = targetUris[tUI];
+
+				//check sources
+				if(targetUri.substr(0, 1) === '@') {
+
+					//save the uri
+					targetDynamicUrls.push(targetUri.substr(1));
+				}
+
+				//check wildcards
+				if(targetUri === '*') {
+					if(expectedUris < tUI) {
+						expectedUris = tUI;
+					}
+				}
+
+				//check queries
+				if(targetUri.substr(0, 1) === '#') {
+					number = parseInt(targetUri.substr(1));
+
+					//if the number is no longer the same as the query string it must have contained non number characters.
+					if(!number || number != targetUri.substr(1)) { throw new Error("Cannot create pointer. A invalid query uri was added to the target url. Query uris can only be numbers and must be greater than zero.."); }
+
+					//if the number is greater than the last pointer length
+					if(expectedUris < number) {
+						expectedUris = number;
+					}
+				}
+			}
+
+			//loop through each pointer url
+			for(pUlI = 0; pUlI < pointerUrls.length; pUlI += 1) {
+				pointerUris = urlToUris(pointerUrls[pUlI]);
+
+				if(pointerUris.length < expectedUris) { throw new Error('Cannot create pointer. The target url requires all pointer urls be a minimum length of ' + expectedUris + '. Check your wildcard and query uris.'); }
+
+				//loop through the pointer uri
+				for(pUiI = 0; pUiI < pointerUris.length; pUiI += 1) {
+					pointerUri = pointerUris[pUiI];
+
+					//if the pointer uri is dynamic
+					if(pointerUri.substr(0, 1) === ':') {
+						for(dTUI = 0; dTUI < targetDynamicUrls.length; dTUI += 1) {
+							if(targetDynamicUrls[dTUI] === pointerUri.substr(1)) {
+								targetDynamicUrls.splice(dTUI, 1);
+								dTUI -= 1;
+							}
+						}
+					}
+				}
+			}
+
+			//if not all the dynamic uris are sourced then throw an error
+			if(targetDynamicUrls.length) {
+				throw new Error('Cannot create pointer. A source uri in the target url does not have a matching dynamic uri in (one of) the pointer url(s).');
+			}
 		}
 	}
 
+	/**
+	 * Takes a url and if its a pointer translates it to a route url
+	 * @param url
+	 */
+	function getPointer(url) {
+		var pI, pointer, pUI, pointerUrl, result, lastScore,
+			matchedPointer, targetUris, pTUI, data,
+			targetUri, key, resultUris, uris, number;
 
+		matchedPointer = false;
+		lastScore = 0;
+		uris = urlToUris(url);
+
+		//loop through the pointers and find one that matches
+		for(pI = 0; pI < pointers.length; pI += 1) {
+
+			//get the pointer
+			pointer = pointers[pI];
+
+			//loop through the pointer's pointer urls
+			for(pUI = 0; pUI < pointer.pointerUrls.length; pUI += 1) {
+
+				//get the pointer url
+				pointerUrl = pointer.pointerUrls[pUI];
+
+				//only check against pointers with the same or less uris than the input url
+				if(uris.length < urlToUris(pointerUrl).length) { continue; }
+
+				//check the pointer url against the target url
+				result = compareUrls(url, pointerUrl);
+
+				//if the pointer matches better than any former match then set it as the new match
+				if(result.score > lastScore) {
+					matchedPointer = pointer;
+					data = result.data;
+					lastScore = result.score;
+				}
+			}
+		}
+
+		if(!matchedPointer) { return false; }
+
+		//fill the data into the pointer target
+		targetUris = urlToUris(matchedPointer.targetUrl);
+		resultUris = [];
+
+		//plugin any data from the pointer url
+		for(pTUI = 0; pTUI < targetUris.length; pTUI += 1) {
+
+			//get the current uri segment
+			targetUri = targetUris[pTUI];
+
+			//if the segment is dynamic then try to insert data
+			if(targetUri.substr(0, 1) === '@') {
+				targetUri = data[targetUri.substr(1)];
+			}
+
+			//if the segment is wild then copy the url over from the target url
+			if(targetUri === '*') {
+				targetUri = uris[pTUI];
+			}
+
+			//if the segment is a query uri
+			if(targetUri.substr(0, 1) === '#') {
+				targetUri = uris[parseInt(targetUri.substr(1)) - 1];
+			}
+
+			resultUris.push(targetUri);
+		}
+
+		return {
+			"targetUrl": matchedPointer.targetUrl,
+			"url": urisToUrl(resultUris),
+			"type": matchedPointer.type
+		};
+	}
 
 
 	/**
@@ -323,6 +604,7 @@
 	return {
 		"bind": bindRoute,
 		"update": handleCurrentRoute,
-		"go": go
+		"go": go,
+		"point": createPointer
 	}
 });
