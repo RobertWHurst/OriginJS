@@ -2,6 +2,11 @@ OriginJS
 ========
 Every route begins with an origin.
 
+Introduction
+============
+OriginJS is a very flexible and powerful router that's easy to use but still offers advanced features if and when
+needed. Features like dynamic redirect and alias pointers, group binding, and scored route matching.
+
 Getting Started
 ===============
 
@@ -10,14 +15,14 @@ load it with [require.js](http://requirejs.org/).
 
 Using Origin is very easy. Here's a very basic example.
 
-	Origin.bind('/', function() {
+	OriginJS.bind('/', function() {
 
 		//home page logic goes here
 		//loaded on /#/ or /
 
 	});
 
-	Origin.bind('/about', function() {
+	OriginJS.bind('/about', function() {
 
 		//about page logic goes here
 		//loaded on /#/about
@@ -25,7 +30,7 @@ Using Origin is very easy. Here's a very basic example.
 	});
 	
 	//instruct the router to try and find then follow a route now that routes above have been added
-	Origin.update()
+	OriginJS.update()
 
 Your links would look like this.
 
@@ -36,7 +41,7 @@ Your links would look like this.
 
 This is far to simple an example for serious applications though so here is an example with a bit more complexity.
 
-	Origin.bind(['/:user/:profilePage', '/:user/:profilePage/+'], function(uris, data) {
+	OriginJS.bind(['/:user/:profilePage', '/:user/:profilePage/+'], function(uris, data) {
 
 		//will match hash urls such as
 		// /#/RobertWHurst/Wall/
@@ -74,18 +79,18 @@ Don't use location.hash to change routes!
 =========================================
 You don't always want to use anchor tags to navigate your app. Sometimes you want to do this programatically. You can use
 location.hash if you really want to, it will work but you shouldn't. Origin has a method for redirecting to other places.
-Its called `Origin.go` and can be uses as follows.
+Its called `OriginJS.go` and can be uses as follows.
 
 	//If a route has been set for /home this will redirect to /#/home/. if no route exists it will redirect /home/
-    Origin.go('/home');
+    OriginJS.go('/home');
 
     //Opens a new tab (or window) containing http://google.com/
-    Origin.go('http://google.com/');
+    OriginJS.go('http://google.com/');
 
     //holding control while ether of these fire will yield a new tab (or window) regardless of the passed url.
 
-As you can see above `Origin.go(url)` Allows to to load any page you like, not just hash routes. You don't even have to think
-about it. Its predictable and yet feels magical. The choice is yours but I would highly recommend `Origin.go(url)` over
+As you can see above `OriginJS.go(url)` Allows to to load any page you like, not just hash routes. You don't even have to think
+about it. Its predictable and yet feels magical. The choice is yours but I would highly recommend `OriginJS.go(url)` over
 `location.hash`.
 
 Documentation
@@ -94,27 +99,28 @@ Documentation
 Bind
 ----
 
-    Origin.bind(route, entryCallback[, exitCallback]);
+    OriginJS.bind(route, setupCallback[, tearDownCallback]);
 
 This method is the corner stone of this library. It binds your route logic to the routes of your application.
 
 
 ### Arguments
 
-`route`: The route you wish to bind. The route can contain dynamic uris such as `*`, `+`, or `:someIdHere`.
-`entryCallback`: The callback that will be executed when you route has been followed.
-`exitCallback`: The callback that will be executed when a different route is loaded.
+`route`: The route you wish to bind. The route can contain dynamic uris such as `*`, `+`, or `:someIdHere`. see `dynamic
+uris` for more details.
+`setupCallback`: Should be a function containing logic for constructing the content for the route.
+`tearDownCallback`: Should be a function containing logic for removing the content for the route. This is optional.
 
-Both the entry callback and the exit callback are passed two arguments; the uris from the hash url, and an object with
-data from any `:someIdHere`s you may have in your route.
+Both the `setupCallback` and the `tearDownCallback` are passed two arguments; A uris array object for the current route,
+and a uris array from the route prior to the current. See uris array for details.
 
 Go
 --
 
-	Origin.go(url);
+	OriginJS.go(url);
 
-At some point you may want to trigger routes or open other pages programatically. This is what `Origin.go(url)` is for.
-If `Origin.bind` is ying, `Origin.go` is yang.
+At some point you may want to trigger routes or open other pages programatically. This is what `OriginJS.go(url)` is for.
+If `OriginJS.bind` is ying, `OriginJS.go` is yang.
 
 ### Arguments
 
@@ -125,9 +131,9 @@ it will open the url in a new tab (or window).
 Update
 ------
 
-	Origin.update();
+	OriginJS.update();
 
-The `Origin.update` method is used to trigger force Origin to match the current hash url routes are defined. You should
+The `OriginJS.update` method is used to trigger force Origin to match the current hash url routes are defined. You should
 call this after your routes are binded in your appication. You should only need to to call this function once.
 
 Credits

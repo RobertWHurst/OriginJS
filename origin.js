@@ -44,13 +44,13 @@
 			return false;
 		}
 
-		//trace pointers if any
-		url = tracePointers(location.hash.substr(1));
+		//trace the url
+		url = trace(location.hash.substr(1));
 
 		//get the route
 		routeData = getRoute(url);
 
-		//if the route is invalid then reset the hash if possible
+		//if there is still no route reset the hash if possible
 		if(!routeData) {
 			if(lastRouteData) {
 				inReset = true;
@@ -59,7 +59,7 @@
 			return false;
 		}
 
-		//execute exit callbacks
+		//execute tear down callbacks
 		if(lastRouteData) {
 			for(lRCI = 0; lRCI < lastRouteData.route.tearDownCallbacks.length; lRCI += 1) {
 				lastRouteData.route.tearDownCallbacks[lRCI](routeData.uriData, lastRouteData.uriData);
@@ -81,7 +81,7 @@
 		 * NOTE: this will change the hash url if it finds a redirect pointer
 		 * @param url
 		 */
-		function tracePointers(url) {
+		function trace(url) {
 			var pointerDepth;
 
 			pointerDepth = 0;
@@ -89,6 +89,15 @@
 			//contain recursion inside a closure
 			return (function exec(url) {
 				var pointer;
+
+				console.log(getRoute(url, {
+					"noCatchall": true
+				}));
+
+				//try and get a route and if that fails continue tracing the pointer
+				if(getRoute(url, {
+					"noCatchall": true
+				})) { return url; }
 
 				//try and get a matching pointer
 				pointer = getPointer(url);
@@ -114,7 +123,7 @@
 				} else {
 					return url;
 				}
-				
+
 			})(url);
 		}
 	}
@@ -161,7 +170,7 @@
 	 * Finds a route that a target url matches then returns the route and uri data
 	 * @param url
 	 */
-	function getRoute(url) {
+	function getRoute(url, rules) {
 		var matchedRoute, sortedRoutes, rGI, sRGI,
 			routeGroup, route, uriData, result,
 			lastRouteScore, key;
@@ -201,7 +210,7 @@
 				route = routeGroup[rI];
 
 				//compare the route url to the target url
-				result = compareUrls(url, route.url);
+				result = compareUrls(url, route.url, rules);
 
 				//attach data to the UriData array
 				for(key in result.data) {
@@ -229,13 +238,17 @@
 	//MODEL     (target)    /cake/test
 	//SUBJECT   (route)     /cake/:test
 
-	function compareUrls(modelUrl, subjectUrl) {
+	function compareUrls(modelUrl, subjectUrl, rules) {
 		var modelUris, subjectUris, score, tUI, subjectUri, modelUri, data;
 
 		modelUris = urlToUris(modelUrl);
 		subjectUris = urlToUris(subjectUrl);
 		score = 0;
 		data = {};
+
+		if(typeof modelUrl !== 'string') { throw new Error('Cannot compare urls. Model url must be a string.'); }
+		if(typeof subjectUrl !== 'string') { throw new Error('Cannot compare urls. Subject url must be a string.'); }
+		if(typeof rules !== 'object') { rules = {}; }
 
 		//handle root
 		if(modelUris.length === 0 && subjectUris.length === 0) {
@@ -257,12 +270,16 @@
 
 			//direct uri match
 			if(subjectUri === modelUri) {
-				score += 1000;
+				if(!rules.noDirect) {
+					score += 1000;
+				}
 			}
 
 			//if dynamic uri match
 			else if(subjectUri.substr(0, 1) === ':') {
-				score += 100;
+				if(!rules.noDynamic) {
+					score += 100;
+				}
 
 				//save the route uri as the key and the target uri as the value for the callback
 				data[subjectUri.substr(1)] = modelUri;
@@ -270,12 +287,16 @@
 
 			//if wild card uri match
 			else if(subjectUri === '*') {
-				score += 10;
+				if(!rules.noWildCard) {
+					score += 10;
+				}
 			}
 
 			//if catch all
 			else if(subjectUri === '+') {
-				score += 1;
+				if(!rules.noCatchall) {
+					score += 1;
+				}
 				break;
 			}
 
@@ -493,7 +514,7 @@
 	function getPointer(url) {
 		var pI, pointer, pUI, pointerUrl, result, lastScore,
 			matchedPointer, targetUris, pTUI, data,
-			targetUri, key, resultUris, uris, number;
+			targetUri, resultUris, uris;
 
 		matchedPointer = false;
 		lastScore = 0;
@@ -580,7 +601,7 @@
 
 			//if the url is relative to the domain
 			} else {
-				if(getRoute(url)) {
+				if(getRoute(url) || getPointer(url)) {
 					if(forceNewTab) {
 						open(location.pathname + '#' + url, '_blank');
 					} else {
