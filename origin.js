@@ -59,6 +59,11 @@
 			return false;
 		}
 
+		//make sure the last route and the current route are not the same
+		if(lastRouteData && routeData.route.url === lastRouteData.route.url) {
+			return false;
+		}
+
 		//execute tear down callbacks
 		if(lastRouteData) {
 			for(lRCI = 0; lRCI < lastRouteData.route.tearDownCallbacks.length; lRCI += 1) {
@@ -89,10 +94,6 @@
 			//contain recursion inside a closure
 			return (function exec(url) {
 				var pointer;
-
-				console.log(getRoute(url, {
-					"noCatchall": true
-				}));
 
 				//try and get a route and if that fails continue tracing the pointer
 				if(getRoute(url, {
