@@ -20,9 +20,7 @@
 	var routes = [],
 		lastRouteData = false,
 		inReset = false,
-		pointers;
-
-	pointers = [];
+		pointers = [];
 
 	//bind to the has change event
 	bind('hashchange', window, handleCurrentRoute);
