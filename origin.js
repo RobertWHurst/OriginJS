@@ -323,13 +323,21 @@
 	 * @param tearDownCallbacks (optional)
 	 */
 	function bindRoute(url, setupCallbacks, tearDownCallbacks) {
-		var matchedRoute, rGK, rI, enI, exI, uris, route;
+		var matchedRoute, rGK, rI, enI, exI, uris, route, uI;
 
 		if(typeof setupCallbacks === 'function') { setupCallbacks = [setupCallbacks]; }
 		if(typeof tearDownCallbacks === 'function') { tearDownCallbacks = [tearDownCallbacks]; }
 
 		setupCallbacks = setupCallbacks || [];
 		tearDownCallbacks = tearDownCallbacks || [];
+
+		//if the url is actually a array the loop through and bind each
+		if(typeof url === 'object' && typeof url.push === 'function') {
+			for(uI = 0; uI < url.length; uI += 1) {
+				bindRoute(url[uI], setupCallbacks, tearDownCallbacks);
+			}
+			return;
+		}
 
 		//make sure the url and callback is defined
 		if(typeof url !== 'string') {
@@ -387,8 +395,6 @@
 
 			routes[uris.length].push(route);
 		}
-
-		return true;
 	}
 
 	/**
