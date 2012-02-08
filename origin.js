@@ -58,7 +58,7 @@
 		}
 
 		//make sure the last route and the current route are not the same
-		if(lastRouteData && routeData.route.url === lastRouteData.route.url) {
+		if(lastRouteData && urisToUrl(routeData.uriData) === urisToUrl(lastRouteData.uriData)) {
 			return false;
 		}
 
