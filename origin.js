@@ -9,12 +9,13 @@
 })(function() {
 
 	//abstractions because of ms's piece o' shit browsers
-	function bind(eventName, element, callback) {if(element.addEventListener){element.addEventListener(eventName,callback,false);}else{element.attachEvent("on"+eventName,function(event){return callback.call(element,event);});}}
-	function trigger(eventName, element) {var a;if(document.createEvent){a=document.createEvent("HTMLEvents");a.initEvent(eventName,true,true);}else{a=document.createEventObject();a.eventType=eventName;}if(document.createEvent){element.dispatchEvent(a);}else{element.fireEvent(a.eventType,a);}}
+	function bind(eventName, element, callback) {if(element.addEventListener){element.addEventListener(eventName,callback,false);}else{if(element===window){element=document.body;}element.attachEvent("on" + eventName,function(event){return callback.call(element,event);});}}
+	function trigger(eventName, element) {var a;if(document.createEvent){a=document.createEvent("HTMLEvents");a.initEvent(eventName,true,true);}else{if(element===window){element=document.body;}a=document.createEventObject();a.eventType='on'+eventName;}if(element.dispatchEvent){element.dispatchEvent(a);}else{element.fireEvent(a.eventType,a);}}
+	function isEventSupported(eventName, element) {var a={'select':'input','change':'input','submit':'form','reset':'form','error':'img','load':'img','abort':'img'};element=element||document.createElement(a[eventName]||'div');eventName='on'+eventName;var b=eventName in element;if(!b){if(!element.setAttribute){element=document.createElement('div');}if(element.setAttribute&&element.removeAttribute){element.setAttribute(eventName,'');b=typeof element[eventName]==='function';if(!is(element[eventName],'undefined')){element[eventName]=undefined;}element.removeAttribute(eventName);}}element=null;return b;}
 
 	//polyfills for ms's piece o' shit browsers
 	[].indexOf||(Array.prototype.indexOf=function(a,b,c){for(c=this.length,b=(c+~~b)%c;b<c&&(!(b in this)||this[b]!==a);b++);return b^c?b:-1;});
-	typeof window.onhashchange!=='undefined'||(function(){var a=location.hash;setInterval(function(){if(a!==location.hash){trigger('hashchange',window);a=location.hash;}},10);})();
+	isEventSupported('hashchange',window)&&(document.documentMode===undefined||document.documentMode>7)||(function(){var a=location.hash;setInterval(function(){if(a!==location.hash){trigger('hashchange',window);a=location.hash;}},1);})();
 
 	//vars
 	var routes = [],
@@ -37,7 +38,7 @@
 			return false;
 		}
 
-		if(inReset) {
+		if(inReset === location.hash.substr(1)) {
 			inReset = false;
 			return false;
 		}
@@ -51,8 +52,7 @@
 		//if there is still no route reset the hash if possible
 		if(!routeData) {
 			if(lastRouteData) {
-				inReset = true;
-				location.hash = '/' + lastRouteData.uriData.join('/');
+				location.hash = inReset = '/' + lastRouteData.uriData.join('/');
 			}
 			return false;
 		}
@@ -112,8 +112,7 @@
 
 					//redirect hash url if pointer is a redirect
 					if(pointer.type === 'redirect') {
-						inReset = true;
-						location.hash = pointer.url;
+						location.hash = inReset = pointer.url;
 					}
 
 					//try to trace the pointer's url and if that fails return the pointer url
