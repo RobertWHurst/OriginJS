@@ -7,6 +7,7 @@
 	}
 
 })(function() {
+	var routes, lastRouteData, inReset, pointers;
 
 	//abstractions because of ms's piece o' shit browsers
 	function bind(eventName, element, callback) {if(element.addEventListener){element.addEventListener(eventName,callback,false);}else{if(element===window){element=document.body;}element.attachEvent("on" + eventName,function(event){return callback.call(element,event);});}}
@@ -18,13 +19,21 @@
 	isEventSupported('hashchange',window)&&(document.documentMode===undefined||document.documentMode>7)||(function(){var a=location.hash;setInterval(function(){if(a!==location.hash){trigger('hashchange',window);a=location.hash;}},1);})();
 
 	//vars
-	var routes = [],
-		lastRouteData = false,
-		inReset = false,
-		pointers = [];
+	routes = [];
+	lastRouteData = false;
+	inReset = false;
+	pointers = [];
 
 	//bind to the has change event
 	bind('hashchange', window, handleCurrentRoute);
+
+	return {
+		"bind": bindRoute,
+		"update": handleCurrentRoute,
+		"go": go,
+		"point": createPointer,
+		"queryLocation": queryLocation
+	}
 
 	/**
 	 * Reads the location hash and tries to find a follow a matching route
@@ -78,52 +87,87 @@
 		lastRouteData = routeData;
 
 		return true;
+	}
 
-		/**
-		 * Traces a pointer chain all the way to the end.
-		 * NOTE: this will change the hash url if it finds a redirect pointer
-		 * @param url
-		 */
-		function trace(url) {
-			var pointerDepth;
+	/**
+	 * Traces a pointer chain all the way to the end.
+	 * NOTE: this will change the hash url if it finds a redirect pointer
+	 * @param url
+	 */
+	function trace(url) {
+		var pointerDepth;
 
-			pointerDepth = 0;
+		pointerDepth = 0;
 
-			//contain recursion inside a closure
-			return (function exec(url) {
-				var pointer;
+		//contain recursion inside a closure
+		return (function exec(url) {
+			var pointer;
 
-				//try and get a route and if that fails continue tracing the pointer
-				if(getRoute(url, {
-					"noCatchall": true
-				})) { return url; }
+			//try and get a route and if that fails continue tracing the pointer
+			if(getRoute(url, {
+				"noCatchall": true
+			})) { return url; }
 
-				//try and get a matching pointer
-				pointer = getPointer(url);
+			//try and get a matching pointer
+			pointer = getPointer(url);
 
-				//if we have a pointer
-				if(pointer) {
+			//if we have a pointer
+			if(pointer) {
 
-					//iterate the depth
-					pointerDepth += 1;
+				//iterate the depth
+				pointerDepth += 1;
 
-					//make sure the pointer depth is less than one hundred
-					if(pointerDepth > 100) { throw new Error('Origin cannot follow "' + url + '" because it has no end point. Check your pointers for loops.') }
+				//make sure the pointer depth is less than one hundred
+				if(pointerDepth > 100) { throw new Error('Origin cannot follow "' + url + '" because it has no end point. Check your pointers for loops.') }
 
-					//redirect hash url if pointer is a redirect
-					if(pointer.type === 'redirect') {
-						location.hash = inReset = pointer.url;
-					}
-
-					//try to trace the pointer's url and if that fails return the pointer url
-					return exec(pointer.url) || pointer.url;
-
-				} else {
-					return url;
+				//redirect hash url if pointer is a redirect
+				if(pointer.type === 'redirect') {
+					location.hash = inReset = pointer.url;
 				}
 
-			})(url);
-		}
+				//try to trace the pointer's url and if that fails return the pointer url
+				return exec(pointer.url) || pointer.url;
+
+			} else {
+				return url;
+			}
+
+		})(url);
+	}
+
+	/**
+	 * Query location
+	 */
+	function queryLocation() {
+		var url, routeData, uris, routeUrl, routeUris, api;
+
+		//get the url
+		url = location.hash.substr(1);
+
+		//get the current route
+		routeData = getRoute(trace(url));
+
+		//get the uris
+		uris = routeData.uriData;
+
+		//get the route
+		routeUrl = routeData.route.url;
+
+		//get the route uris
+		routeUris = urlToUris(routeUrl);
+
+		api = {
+			"location": {
+				"url": url,
+				"uris": uris
+			},
+			"route": {
+				"url": routeUrl,
+				"uris": routeUris
+			}
+		};
+
+		return api;
 	}
 
 	/**
@@ -624,12 +668,5 @@
 		} else {
 			location.reload();
 		}
-	}
-
-	return {
-		"bind": bindRoute,
-		"update": handleCurrentRoute,
-		"go": go,
-		"point": createPointer
 	}
 });
