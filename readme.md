@@ -8,10 +8,6 @@ OriginJS is am awesome clent slide router. It's lightweight, easy to use, and ha
 If your building a single page application, and javascript game, or anything else heavy in javascript, OriginJS will
 make your application more accessable and might even help you code in a more organized way.
 
-Examples
-========
-If your looking for examples and a bit more detail you should checkout the [OriginJS homepage (incomplete)](robertwhurst.github.com/OriginJS).
-You some also have a look at the example applications in the examples directory.
 
 Documentation
 =============
