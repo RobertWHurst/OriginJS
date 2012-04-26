@@ -7,7 +7,7 @@
 	}
 
 })(function() {
-	var routes, lastRouteData, inReset, pointers;
+	var routes, currentRoutes, inReset, pointers;
 
 	//abstractions because of ms's piece o' shit browsers
 	function bind(eventName, element, callback) {if(element.addEventListener){element.addEventListener(eventName,callback,false);}else{if(element===window){element=document.body;}element.attachEvent("on" + eventName,function(event){return callback.call(element,event);});}}
@@ -20,7 +20,7 @@
 
 	//vars
 	routes = [];
-	lastRouteData = false;
+	currentRoutes = [];
 	inReset = false;
 	pointers = [];
 
@@ -33,13 +33,16 @@
 		"go": go,
 		"point": createPointer,
 		"queryLocation": queryLocation
-	}
+	};
 
 	/**
 	 * Reads the location hash and tries to find a follow a matching route
 	 */
 	function handleCurrentRoute() {
-		var url, routeData, lRCI, rCI;
+		var url, newRoutes, _currentRoutes, nRI, cRI, tDCI, sUCI, active;
+
+		//init vars
+		_currentRoutes = [];
 
 		//add the hash if it doesn't exist
 		if (!location.hash) {
@@ -56,35 +59,51 @@
 		url = trace(location.hash.substr(1));
 
 		//get the route
-		routeData = getRoute(url);
+		newRoutes = getRoutes(url);
 
-		//if there is still no route reset the hash if possible
-		if(!routeData) {
-			if(lastRouteData) {
-				location.hash = inReset = '/' + lastRouteData.uriData.join('/');
+		//call the tear down callbacks of all non active routes
+		for(cRI = 0; cRI < currentRoutes.length; cRI += 1) {
+
+			//check if the route is still active
+			active = false;
+			for(nRI = 0; nRI < newRoutes.length; nRI += 1) {
+				if(newRoutes[nRI].route.url === currentRoutes[cRI].route.url) {
+					active = true;
+				}
 			}
-			return false;
-		}
 
-		//make sure the last route and the current route are not the same
-		if(lastRouteData && urisToUrl(routeData.uriData) === urisToUrl(lastRouteData.uriData)) {
-			return false;
-		}
-
-		//execute tear down callbacks
-		if(lastRouteData) {
-			for(lRCI = 0; lRCI < lastRouteData.route.tearDownCallbacks.length; lRCI += 1) {
-				lastRouteData.route.tearDownCallbacks[lRCI](routeData.uriData, lastRouteData.uriData);
+			//if the route is inactive then kill it
+			if(!active) {
+				for(tDCI = 0; tDCI < currentRoutes[cRI].route.tearDownCallbacks.length; tDCI += 1) {
+					currentRoutes[cRI].route.tearDownCallbacks[tDCI](currentRoutes[cRI].uriData);
+				}
+			} else {
+				_currentRoutes.push(currentRoutes[cRI]);
 			}
 		}
 
-		//execute setup callbacks
-		for(rCI = 0; rCI < routeData.route.setupCallbacks.length; rCI += 1) {
-			routeData.route.setupCallbacks[rCI](routeData.uriData, lastRouteData.uriData);
+		//activate new routes that are not currently active
+		for(nRI = 0; nRI < newRoutes.length; nRI += 1) {
+
+			//check if the route is already active
+			active = false;
+			for(cRI = 0; cRI < currentRoutes.length; cRI += 1) {
+				if(currentRoutes[cRI].route.url === newRoutes[nRI].route.url) {
+					active = true;
+				}
+			}
+
+			//if the route is inactive then execute it
+			if(!active) {
+				for(sUCI = 0; sUCI < newRoutes[nRI].route.setupCallbacks.length; sUCI += 1) {
+					newRoutes[nRI].route.setupCallbacks[sUCI](newRoutes[nRI].uriData);
+					_currentRoutes.push(newRoutes[nRI]);
+				}
+			}
 		}
 
-		//save the route as the last route
-		lastRouteData = routeData;
+		//update the current routes
+		currentRoutes = _currentRoutes;
 
 		return true;
 	}
@@ -104,7 +123,7 @@
 			var pointer;
 
 			//try and get a route and if that fails continue tracing the pointer
-			if(getRoute(url, {
+			if(getRoutes(url, {
 				"noCatchall": true
 			})) { return url; }
 
@@ -145,7 +164,7 @@
 		url = location.hash.substr(1);
 
 		//get the current route
-		routeData = getRoute(trace(url));
+		routeData = getRoutes(trace(url));
 
 		//get the uris
 		uris = routeData.uriData;
@@ -212,10 +231,11 @@
 	 * Finds a route that a target url matches then returns the route and uri data
 	 * @param url
 	 */
-	function getRoute(url, rules) {
-		var matchedRoute, sortedRoutes, rGI, sRGI,
+	function getRoutes(url, rules) {
+		var terminalRoute, sortedRoutes, rGI, sRGI,
 			routeGroup, route, uriData, result,
-			lastRouteScore, key;
+			lastRouteScore, key, rI, cascadingRoutes,
+			cI, matchedRoutes, routeUriData, uI;
 
 		//validate the arguments
 		if(typeof url !== 'string') { throw new Error('Cannot get route. Requires a valid route.'); }
@@ -226,18 +246,18 @@
 		//convert the url to uris
 		uriData = urlToUris(url);
 
-		//flip the order of the routes object so its longest to shortest and filter out routes that are
-		// longer than the target
+		//flip the order of the routes object so its longest to shortest
 		sortedRoutes = [];
 		for(rGI = 0; rGI < routes.length; rGI += 1) {
-			if(!routes[rGI]) { continue; }
-			if(rGI > uriData.length) { break; }
+			if(!routes[rGI] || sortedRoutes.indexOf(routes[rGI]) > -1) { continue; }
 			sortedRoutes.unshift(routes[rGI]);
 		}
 
 		//setup the setup the loop initial state of the loop variables
-		matchedRoute = false;
+		terminalRoute = false;
 		lastRouteScore = 0;
+		cascadingRoutes = [];
+		matchedRoutes = [];
 
 		//loop through each of the route groups
 		for(sRGI = 0; sRGI < sortedRoutes.length; sRGI += 1) {
@@ -255,72 +275,97 @@
 				result = compareUrls(url, route.url, rules);
 
 				//attach data to the UriData array
-				for(key in result.data) {
-					if(!result.data.hasOwnProperty(key)) { continue; }
-					uriData[key] = result.data[key];
+				routeUriData = [];
+				for(uI = 0; uI < uriData.length; uI += 1) {
+					routeUriData[uI] = uriData[uI];
 				}
 
-				if(result.score > lastRouteScore) {
+				//attach data to the UriData array
+				for(key in result.data) {
+					if(!result.data.hasOwnProperty(key)) { continue; }
+					routeUriData[key] = result.data[key];
+				}
+
+				//if the route cascades then keep it
+				if(result.score > 0 && result.cascade) {
+					cascadingRoutes[result.score] = {
+						"route": route,
+						"uriData": routeUriData
+					};
+				}
+
+				//if the route has a better score than the last then
+				// replace it
+				if(result.score > lastRouteScore && !result.cascade) {
 					lastRouteScore = result.score;
-					matchedRoute = route;
+					terminalRoute = {
+						"route": route,
+						"uriData": routeUriData
+					};
 				}
 			}
 		}
 
+		for(cI = 0; cI < cascadingRoutes.length; cI += 1) {
+			if(!cascadingRoutes[cI]) { continue; }
+			if(matchedRoutes.indexOf(cascadingRoutes[cI]) > -1) { continue; }
+			matchedRoutes.push(cascadingRoutes[cI]);
+		}
+
+		if(terminalRoute) {
+			if(matchedRoutes.indexOf(terminalRoute) === -1) {
+				matchedRoutes.push(terminalRoute);
+			}
+		}
+
 		//return false if no route was returned
-		if(!matchedRoute) { return false; }
+		if(matchedRoutes.length === 0) { return false; }
 
 		//return the matched route
-		return {
-			"route": matchedRoute,
-			"uriData": uriData
-		};
+		return matchedRoutes;
 	}
 
 	//MODEL     (target)    /cake/test
 	//SUBJECT   (route)     /cake/:test
 
 	function compareUrls(modelUrl, subjectUrl, rules) {
-		var modelUris, subjectUris, score, tUI, subjectUri, modelUri, data;
+		var modelUris, subjectUris, score, uI, subjectUri, modelUri, data, cascading;
 
 		modelUris = urlToUris(modelUrl);
 		subjectUris = urlToUris(subjectUrl);
 		score = 0;
 		data = {};
+		cascading = false;
 
 		if(typeof modelUrl !== 'string') { throw new Error('Cannot compare urls. Model url must be a string.'); }
 		if(typeof subjectUrl !== 'string') { throw new Error('Cannot compare urls. Subject url must be a string.'); }
 		if(typeof rules !== 'object') { rules = {}; }
 
-		//handle root
-		if(modelUris.length === 0 && subjectUris.length === 0) {
-			score = 1;
-		}
-
 		//loop through the target uris and compare to the route urls counter part.
-		for(tUI = 0; tUI < modelUris.length; tUI += 1) {
+		for(uI = 0; uI < modelUris.length || uI < subjectUris.length; uI += 1) {
 
 			//get both the route and the target uri
-			subjectUri = subjectUris[tUI];
-			modelUri = modelUris[tUI];
+			subjectUri = subjectUris[uI];
+			modelUri = modelUris[uI];
 
-			//if the route doesn't have a corresponding uri then break out of the loop and check the next route
-			if(!subjectUri) {
+			//if the route doesn't have a corresponding uri then break out of the loop
+			if(!modelUri && subjectUri !== '.' && subjectUri !== '+') {
 				score = 0;
+				cascading = false;
 				break;
 			}
 
 			//direct uri match
 			if(subjectUri === modelUri) {
 				if(!rules.noDirect) {
-					score += 1000;
+					score += 5;
 				}
 			}
 
 			//if dynamic uri match
 			else if(subjectUri.substr(0, 1) === ':') {
 				if(!rules.noDynamic) {
-					score += 100;
+					score += 4;
 				}
 
 				//save the route uri as the key and the target uri as the value for the callback
@@ -330,8 +375,17 @@
 			//if wild card uri match
 			else if(subjectUri === '*') {
 				if(!rules.noWildCard) {
-					score += 10;
+					score += 3;
 				}
+			}
+
+			//if catch all
+			else if(subjectUri === '.') {
+				if(!rules.noCascade) {
+					score += 2;
+					cascading = true;
+				}
+				break;
 			}
 
 			//if catch all
@@ -351,7 +405,8 @@
 
 		return {
 			"score": score,
-			"data": data
+			"cascade": cascading,
+			"uriData": data
 		}
 	}
 
@@ -649,7 +704,7 @@
 
 			//if the url is relative to the domain
 			} else {
-				if(getRoute(url) || getPointer(url)) {
+				if(getRoutes(url) || getPointer(url)) {
 					if(forceNewTab) {
 						open(location.pathname + '#' + url, '_blank');
 					} else {
