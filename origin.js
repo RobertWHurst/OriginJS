@@ -7,7 +7,7 @@
 	}
 
 })(function() {
-	var routes, currentRoutes, inReset, pointers;
+	var routes, currentRoutes, inReset, pointers, DEBUG;
 
 	//abstractions because of ms's piece o' shit browsers
 	function bind(eventName, element, callback) {if(element.addEventListener){element.addEventListener(eventName,callback,false);}else{if(element===window){element=document.body;}element.attachEvent("on" + eventName,function(event){return callback.call(element,event);});}}
@@ -17,6 +17,9 @@
 	//polyfills for ms's piece o' shit browsers
 	[].indexOf||(Array.prototype.indexOf=function(a,b,c){for(c=this.length,b=(c+~~b)%c;b<c&&(!(b in this)||this[b]!==a);b++);return b^c?b:-1;});
 	isEventSupported('hashchange',window)&&(document.documentMode===undefined||document.documentMode>7)||(function(){var a=location.hash;setInterval(function(){if(a!==location.hash){trigger('hashchange',window);a=location.hash;}},1);})();
+
+	//DEBUG
+	DEBUG = true;
 
 	//vars
 	routes = [];
@@ -341,6 +344,15 @@
 		if(typeof subjectUrl !== 'string') { throw new Error('Cannot compare urls. Subject url must be a string.'); }
 		if(typeof rules !== 'object') { rules = {}; }
 
+		DEBUG && console.log('');
+		DEBUG && console.log(modelUrl + ' <===> ' + subjectUrl);
+
+		//handle root
+		if(modelUris.length === 0 && subjectUris.length === 0) {
+			score += 5;
+			DEBUG && console.log('    ROOT MATCH');
+		}
+
 		//loop through the target uris and compare to the route urls counter part.
 		for(uI = 0; uI < modelUris.length || uI < subjectUris.length; uI += 1) {
 
@@ -348,10 +360,13 @@
 			subjectUri = subjectUris[uI];
 			modelUri = modelUris[uI];
 
-			//if the route doesn't have a corresponding uri then break out of the loop
-			if(!modelUri && subjectUri !== '.' && subjectUri !== '+') {
+			DEBUG && console.log('/' + (modelUri || '') + ' <-> ' + '/' + (subjectUri || ''));
+
+			//if no subject uri
+			if(!modelUri && subjectUri !== '.' && subjectUri !== '+' || !subjectUri) {
 				score = 0;
 				cascading = false;
+				DEBUG && console.log('    =0 | MISSING SEGMENT');
 				break;
 			}
 
@@ -359,6 +374,7 @@
 			if(subjectUri === modelUri) {
 				if(!rules.noDirect) {
 					score += 5;
+					DEBUG && console.log('    +5 | DIRECT MATCH');
 				}
 			}
 
@@ -366,6 +382,7 @@
 			else if(subjectUri.substr(0, 1) === ':') {
 				if(!rules.noDynamic) {
 					score += 4;
+					DEBUG && console.log('    +4 | DYNAMIC MATCH');
 				}
 
 				//save the route uri as the key and the target uri as the value for the callback
@@ -376,6 +393,7 @@
 			else if(subjectUri === '*') {
 				if(!rules.noWildCard) {
 					score += 3;
+					DEBUG && console.log('    +3 | WILDCARD MATCH');
 				}
 			}
 
@@ -384,6 +402,7 @@
 				if(!rules.noCascade) {
 					score += 2;
 					cascading = true;
+					DEBUG && console.log('    +2 | CASCADING CATCHALL MATCH');
 				}
 				break;
 			}
@@ -392,6 +411,7 @@
 			else if(subjectUri === '+') {
 				if(!rules.noCatchall) {
 					score += 1;
+					DEBUG && console.log('    +1 | TERMINATING CATCHALL MATCH');
 				}
 				break;
 			}
@@ -399,9 +419,13 @@
 			//if there is no match at all
 			else {
 				score = 0;
+				DEBUG && console.log('    =0 | NO MATCH');
 				break;
 			}
 		}
+
+		DEBUG && console.log('  SCORE: ' + score + (cascading && ' & CASSCADING' || ''));
+		DEBUG && console.log('');
 
 		return {
 			"score": score,
