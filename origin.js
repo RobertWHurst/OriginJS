@@ -19,7 +19,7 @@
 	isEventSupported('hashchange',window)&&(document.documentMode===undefined||document.documentMode>7)||(function(){var a=location.hash;setInterval(function(){if(a!==location.hash){trigger('hashchange',window);a=location.hash;}},1);})();
 
 	//DEBUG
-	DEBUG = true;
+	DEBUG = false;
 
 	//vars
 	routes = [];
@@ -32,7 +32,6 @@
 
 	return {
 		"bind": bindRoute,
-		"update": handleCurrentRoute,
 		"go": go,
 		"point": createPointer,
 		"queryLocation": queryLocation
@@ -424,7 +423,7 @@
 			}
 		}
 
-		DEBUG && console.log('  SCORE: ' + score + (cascading && ' & CASSCADING' || ''));
+		DEBUG && console.log('  SCORE: ' + score + (cascading && ' & CASCADING' || ''));
 		DEBUG && console.log('');
 
 		return {
@@ -515,6 +514,8 @@
 
 			routes[uris.length].push(route);
 		}
+
+		handleCurrentRoute();
 	}
 
 	/**

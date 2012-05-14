@@ -32,6 +32,10 @@ bind('load', window, function() {
 		page.innerHTML = '<h2>Contact</h2><p>If you find any issues or you have a request regarding OriginJS please post an issue on the <a href="http://github.com/RobertWHurst/OriginJS/issues" target="_blank">issue tracker</a>.</p>';
 	});
 
+	OriginJS.bind('/.', function() {
+		console.log('cascade!');
+	});
+
 	//load the current route
 	OriginJS.update();
 
