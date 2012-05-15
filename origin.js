@@ -1,13 +1,13 @@
-(function(factory) {
+(function(context, factory) {
 
 	if(typeof define === 'function' && define.amd) {
 		define(factory);
 	} else {
-		window.OriginJS = factory();
+		context.o = context.OriginJS = factory();
 	}
 
-})(function() {
-	var routes, currentRoutes, inReset, pointers, DEBUG;
+})(this, function() {
+	var api, routes, currentRoutes, inReset, pointers, DEBUG;
 
 	//abstractions because of ms's piece o' shit browsers
 	function bind(eventName, element, callback) {if(element.addEventListener){element.addEventListener(eventName,callback,false);}else{if(element===window){element=document.body;}element.attachEvent("on" + eventName,function(event){return callback.call(element,event);});}}
@@ -30,18 +30,20 @@
 	//bind to the has change event
 	bind('hashchange', window, handleCurrentRoute);
 
-	return {
-		"bind": bindRoute,
-		"go": go,
-		"point": createPointer,
-		"queryLocation": queryLocation
-	};
+	api = {};
+	api.bind = bindRouteSync;
+	api.bind.async = bindRouteAsync;
+	api.go = go;
+	api.point = createPointer;
+	api.route = queryLocation;
+
+	return api;
 
 	/**
 	 * Reads the location hash and tries to find a follow a matching route
 	 */
 	function handleCurrentRoute() {
-		var url, newRoutes, _currentRoutes, nRI, cRI, tDCI, sUCI, active;
+		var url, newRoutes, _currentRoutes;
 
 		//init vars
 		_currentRoutes = [];
@@ -64,50 +66,118 @@
 		newRoutes = getRoutes(url);
 
 		//call the tear down callbacks of all non active routes
-		for(cRI = 0; cRI < currentRoutes.length; cRI += 1) {
+		cleanRoutes(function() {
 
-			//check if the route is still active
-			active = false;
-			for(nRI = 0; nRI < newRoutes.length; nRI += 1) {
-				if(newRoutes[nRI].route.url === currentRoutes[cRI].route.url) {
-					active = true;
-				}
-			}
-
-			//if the route is inactive then kill it
-			if(!active) {
-				for(tDCI = 0; tDCI < currentRoutes[cRI].route.tearDownCallbacks.length; tDCI += 1) {
-					currentRoutes[cRI].route.tearDownCallbacks[tDCI](currentRoutes[cRI].uriData);
-				}
-			} else {
-				_currentRoutes.push(currentRoutes[cRI]);
-			}
-		}
-
-		//activate new routes that are not currently active
-		for(nRI = 0; nRI < newRoutes.length; nRI += 1) {
-
-			//check if the route is already active
-			active = false;
-			for(cRI = 0; cRI < currentRoutes.length; cRI += 1) {
-				if(currentRoutes[cRI].route.url === newRoutes[nRI].route.url) {
-					active = true;
-				}
-			}
-
-			//if the route is inactive then execute it
-			if(!active) {
-				for(sUCI = 0; sUCI < newRoutes[nRI].route.setupCallbacks.length; sUCI += 1) {
-					newRoutes[nRI].route.setupCallbacks[sUCI](newRoutes[nRI].uriData);
-					_currentRoutes.push(newRoutes[nRI]);
-				}
-			}
-		}
-
-		//update the current routes
-		currentRoutes = _currentRoutes;
+			//activate new routes that are not currently active
+			updateRoutes(function() {
+				//update the current routes
+				currentRoutes = _currentRoutes;
+			});
+		});
 
 		return true;
+
+		/**
+		 * Cleans out inactive routes
+		 * @param callback
+		 */
+		function cleanRoutes(callback) {
+			var cRI, nRI, tDCI, active, executionsLeft;
+
+			executionsLeft = 0;
+
+			if(currentRoutes.length > 0) {
+				for(cRI = 0; cRI < currentRoutes.length; cRI += 1) {
+
+					//check if the route is still active
+					active = false;
+					for(nRI = 0; nRI < newRoutes.length; nRI += 1) {
+						if(newRoutes[nRI].route.url === currentRoutes[cRI].route.url) {
+							active = true;
+						}
+					}
+
+					//if the route is inactive then kill it
+					if(!active) {
+						if(currentRoutes[cRI].route.tearDownCallbacks.length > 0) {
+							for(tDCI = 0; tDCI < currentRoutes[cRI].route.tearDownCallbacks.length; tDCI += 1) {
+
+								if(currentRoutes[cRI].route.async) {
+
+									executionsLeft += 1;
+									currentRoutes[cRI].route.tearDownCallbacks[tDCI](exec, currentRoutes[cRI].uriData);
+								} else {
+
+									currentRoutes[cRI].route.tearDownCallbacks[tDCI](currentRoutes[cRI].uriData);
+								}
+
+							}
+						}
+					} else {
+						_currentRoutes.push(currentRoutes[cRI]);
+					}
+				}
+			}
+
+			exec();
+
+			function exec() {
+				if(executionsLeft === 0) {
+					callback();
+				} else {
+					executionsLeft -= 1;
+				}
+			}
+		}
+
+		/**
+		 * activates routes
+		 * @param callback
+		 */
+		function updateRoutes(callback) {
+			var nRI, cRI, sUCI, active, executionsLeft;
+
+			executionsLeft = 0;
+
+			if(newRoutes.length > 0) {
+				for(nRI = 0; nRI < newRoutes.length; nRI += 1) {
+
+					//check if the route is already active
+					active = false;
+					for(cRI = 0; cRI < currentRoutes.length; cRI += 1) {
+						if(currentRoutes[cRI].route.url === newRoutes[nRI].route.url) {
+							active = true;
+						}
+					}
+
+					//if the route is inactive then execute it
+					if(!active) {
+						if(newRoutes[nRI].route.setupCallbacks.length > 0) {
+							for(sUCI = 0; sUCI < newRoutes[nRI].route.setupCallbacks.length; sUCI += 1) {
+								if(newRoutes[nRI].route.async) {
+									executionsLeft += 1;
+									newRoutes[nRI].route.setupCallbacks[sUCI](exec, newRoutes[nRI].uriData);
+								} else {
+
+									newRoutes[nRI].route.setupCallbacks[sUCI](newRoutes[nRI].uriData);
+								}
+							}
+						}
+						_currentRoutes.push(newRoutes[nRI]);
+					}
+				}
+			}
+
+			exec();
+
+			function exec() {
+				if(executionsLeft === 0) {
+					callback();
+				} else {
+					executionsLeft -= 1;
+				}
+			}
+		}
 	}
 
 	/**
@@ -437,25 +507,59 @@
 	 * Binds a route url to a callback that is fired when the route is triggered.
 	 * An optional second callback can be passed that is executed when a
 	 * different route is triggered. This is useful for doing cleanup.
+	 *
+	 * @param url
+	 * @param setupCallbacks
+	 * @param tearDownCallbacks
+	 * @return {*}
+	 */
+	function bindRouteSync(url, setupCallbacks, tearDownCallbacks) {
+		return bindRoute(url, false, setupCallbacks, tearDownCallbacks);
+	}
+
+	/**
+	 * Binds a route url to a callback that is fired when the route is triggered.
+	 * An optional second callback can be passed that is executed when a
+	 * different route is triggered. This is useful for doing cleanup.
+	 *
+	 * @param url
+	 * @param setupCallbacks
+	 * @param tearDownCallbacks
+	 * @return {*}
+	 */
+	function bindRouteAsync(url, setupCallbacks, tearDownCallbacks) {
+		return bindRoute(url, true, setupCallbacks, tearDownCallbacks);
+	}
+
+	/**
+	 * Binds a route url to a callback that is fired when the route is triggered.
+	 * An optional second callback can be passed that is executed when a
+	 * different route is triggered. This is useful for doing cleanup.
 	 * @param url
 	 * @param setupCallbacks
 	 * @param tearDownCallbacks (optional)
 	 */
-	function bindRoute(url, setupCallbacks, tearDownCallbacks) {
-		var matchedRoute, rGK, rI, enI, exI, uris, route, uI;
+	function bindRoute(url, async, setupCallbacks, tearDownCallbacks) {
+		var matchedRoute, bindings, rGK, rI, enI, exI, uris, route, uI, api;
 
 		if(typeof setupCallbacks === 'function') { setupCallbacks = [setupCallbacks]; }
 		if(typeof tearDownCallbacks === 'function') { tearDownCallbacks = [tearDownCallbacks]; }
+
+		api = {
+			"clear": clear
+		};
 
 		setupCallbacks = setupCallbacks || [];
 		tearDownCallbacks = tearDownCallbacks || [];
 
 		//if the url is actually a array the loop through and bind each
 		if(typeof url === 'object' && typeof url.push === 'function') {
+
+			bindings = [];
 			for(uI = 0; uI < url.length; uI += 1) {
-				bindRoute(url[uI], setupCallbacks, tearDownCallbacks);
+				bindings.push(bindRoute(url[uI], async, setupCallbacks, tearDownCallbacks));
 			}
-			return;
+			return api;
 		}
 
 		//make sure the url and callback is defined
@@ -509,13 +613,27 @@
 			route = {
 				"url": url,
 				"setupCallbacks": setupCallbacks,
-				"tearDownCallbacks": tearDownCallbacks
+				"tearDownCallbacks": tearDownCallbacks,
+				"async": async
 			};
 
 			routes[uris.length].push(route);
 		}
 
 		handleCurrentRoute();
+
+		return api;
+
+		function clear() {
+			var bI;
+			if(!bindings) {
+				routes[uris.length].splice(routes[uris.length].indexOf(route), 1);
+			} else {
+				for(bI = 0; bI < bindings.length; bI += 1) {
+					bindings[bI].clear();
+				}
+			}
+		}
 	}
 
 	/**
