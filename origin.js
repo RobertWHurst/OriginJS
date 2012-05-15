@@ -35,7 +35,10 @@
 	api.bind.async = bindRouteAsync;
 	api.go = go;
 	api.point = createPointer;
-	api.route = queryLocation;
+	api.status = queryLocation;
+	api.urlToUris = urlToUris;
+	api.urisToUrl = urisToUrl;
+	api.cleanUrl = cleanUrl;
 
 	return api;
 
