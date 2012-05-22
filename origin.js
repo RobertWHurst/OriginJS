@@ -7,7 +7,7 @@
 	}
 
 })(this, function() {
-	var api, routes, currentRoutes, inReset, pointers, DEBUG;
+	var api, routes, currentRoutes, inReset, pointers, debug;
 
 	//abstractions because of ms's piece o' shit browsers
 	function bind(eventName, element, callback) {if(element.addEventListener){element.addEventListener(eventName,callback,false);}else{if(element===window){element=document.body;}element.attachEvent("on" + eventName,function(event){return callback.call(element,event);});}}
@@ -19,7 +19,10 @@
 	isEventSupported('hashchange',window)&&(document.documentMode===undefined||document.documentMode>7)||(function(){var a=location.hash;setInterval(function(){if(a!==location.hash){trigger('hashchange',window);a=location.hash;}},1);})();
 
 	//DEBUG
-	DEBUG = false;
+	if(typeof DEBUG === 'undefined') {
+		DEBUG = {};
+	}
+	debug = DEBUG['OriginJS'];
 
 	//vars
 	routes = [];
@@ -68,9 +71,8 @@
 		//get the route
 		newRoutes = getRoutes(url);
 
-		//call the tear down callbacks of all non active routes
+		//run the route callbacks
 		cleanRoutes(function() {
-
 			//activate new routes that are not currently active
 			updateRoutes(function() {
 				//update the current routes
@@ -85,39 +87,36 @@
 		 * @param callback
 		 */
 		function cleanRoutes(callback) {
-			var cRI, nRI, tDCI, active, executionsLeft;
+			var rI, route, nRI, active, bI, binding, cI, executionsLeft;
 
 			executionsLeft = 0;
 
-			if(currentRoutes.length > 0) {
-				for(cRI = 0; cRI < currentRoutes.length; cRI += 1) {
+			for(rI = 0; rI < routes.length; rI += 1) {
+				route = routes[rI];
 
-					//check if the route is still active
-					active = false;
-					for(nRI = 0; nRI < newRoutes.length; nRI += 1) {
-						if(newRoutes[nRI].route.url === currentRoutes[cRI].route.url) {
-							active = true;
-						}
+				active = false;
+				for(nRI = 0; nRI < newRoutes.length; nRI += 1) {
+					if(newRoutes[nRI].url === route.url) {
+						active = true;
+						break;
 					}
+				}
 
-					//if the route is inactive then kill it
-					if(!active) {
-						if(currentRoutes[cRI].route.tearDownCallbacks.length > 0) {
-							for(tDCI = 0; tDCI < currentRoutes[cRI].route.tearDownCallbacks.length; tDCI += 1) {
+				if(active) { continue; }
 
-								if(currentRoutes[cRI].route.async) {
+				for(bI = 0; bI < route.bindings.length; bI += 1) {
+					binding = route.bindings[bI];
 
-									executionsLeft += 1;
-									currentRoutes[cRI].route.tearDownCallbacks[tDCI](exec, currentRoutes[cRI].uriData);
-								} else {
+					if(!binding.active) { continue; }
 
-									currentRoutes[cRI].route.tearDownCallbacks[tDCI](currentRoutes[cRI].uriData);
-								}
-
-							}
+					for(cI = 0; cI < binding.tearDownCallbacks.length; cI += 1) {
+						if(binding.async) {
+							executionsLeft += 1;
+							binding.tearDownCallbacks[cI](exec, route.uriData);
+						} else {
+							binding.tearDownCallbacks[cI](route.uriData);
 						}
-					} else {
-						_currentRoutes.push(currentRoutes[cRI]);
+						binding.active = false;
 					}
 				}
 			}
@@ -138,35 +137,28 @@
 		 * @param callback
 		 */
 		function updateRoutes(callback) {
-			var nRI, cRI, sUCI, active, executionsLeft;
+			var nRI, route, bI, binding, cI, executionsLeft;
 
 			executionsLeft = 0;
 
 			if(newRoutes.length > 0) {
 				for(nRI = 0; nRI < newRoutes.length; nRI += 1) {
+					route = newRoutes[nRI];
 
-					//check if the route is already active
-					active = false;
-					for(cRI = 0; cRI < currentRoutes.length; cRI += 1) {
-						if(currentRoutes[cRI].route.url === newRoutes[nRI].route.url) {
-							active = true;
-						}
-					}
+					for(bI = 0; bI < route.bindings.length; bI += 1) {
+						binding = route.bindings[bI];
 
-					//if the route is inactive then execute it
-					if(!active) {
-						if(newRoutes[nRI].route.setupCallbacks.length > 0) {
-							for(sUCI = 0; sUCI < newRoutes[nRI].route.setupCallbacks.length; sUCI += 1) {
-								if(newRoutes[nRI].route.async) {
-									executionsLeft += 1;
-									newRoutes[nRI].route.setupCallbacks[sUCI](exec, newRoutes[nRI].uriData);
-								} else {
+						if(binding.active) { continue; }
 
-									newRoutes[nRI].route.setupCallbacks[sUCI](newRoutes[nRI].uriData);
-								}
+						for(cI = 0; cI < binding.setupCallbacks.length; cI += 1) {
+							if(binding.async) {
+								executionsLeft += 1;
+								binding.setupCallbacks[cI](exec, newRoutes[nRI].uriData);
+							} else {
+								binding.setupCallbacks[cI](newRoutes[nRI].uriData);
 							}
+							binding.active = true;
 						}
-						_currentRoutes.push(newRoutes[nRI]);
 					}
 				}
 			}
@@ -307,10 +299,10 @@
 	 * @param url
 	 */
 	function getRoutes(url, rules) {
-		var terminalRoute, sortedRoutes, rGI, sRGI,
-			routeGroup, route, uriData, result,
-			lastRouteScore, key, rI, cascadingRoutes,
-			cI, matchedRoutes, routeUriData, uI;
+		var terminalRoute, route, uriData,
+			result, lastRouteScore,
+			key, rI, cascadingRoutes, cI,
+			matchedRoutes, routeUriData, uI;
 
 		//validate the arguments
 		if(typeof url !== 'string') { throw new Error('Cannot get route. Requires a valid route.'); }
@@ -321,63 +313,46 @@
 		//convert the url to uris
 		uriData = urlToUris(url);
 
-		//flip the order of the routes object so its longest to shortest
-		sortedRoutes = [];
-		for(rGI = 0; rGI < routes.length; rGI += 1) {
-			if(!routes[rGI] || sortedRoutes.indexOf(routes[rGI]) > -1) { continue; }
-			sortedRoutes.unshift(routes[rGI]);
-		}
-
 		//setup the setup the loop initial state of the loop variables
 		terminalRoute = false;
 		lastRouteScore = 0;
 		cascadingRoutes = [];
 		matchedRoutes = [];
 
-		//loop through each of the route groups
-		for(sRGI = 0; sRGI < sortedRoutes.length; sRGI += 1) {
+		//loop through each route in the current group
+		for(rI = 0; rI < routes.length; rI += 1) {
 
-			//grab the group
-			routeGroup = sortedRoutes[sRGI];
+			//grab the route
+			route = routes[rI];
 
-			//loop through each route in the current group
-			for(rI = 0; rI < routeGroup.length; rI += 1) {
+			//compare the route url to the target url
+			result = compareUrls(url, route.url, rules);
 
-				//grab the route
-				route = routeGroup[rI];
+			//attach data to the UriData array
+			routeUriData = [];
+			for(uI = 0; uI < uriData.length; uI += 1) {
+				routeUriData[uI] = uriData[uI];
+			}
 
-				//compare the route url to the target url
-				result = compareUrls(url, route.url, rules);
+			//attach data to the UriData array
+			for(key in result.data) {
+				if(!result.data.hasOwnProperty(key)) { continue; }
+				routeUriData[key] = result.data[key];
+			}
 
-				//attach data to the UriData array
-				routeUriData = [];
-				for(uI = 0; uI < uriData.length; uI += 1) {
-					routeUriData[uI] = uriData[uI];
-				}
+			//if the route cascades then keep it
+			if(result.score > 0 && result.cascade) {
+				route.uriData = routeUriData;
+				cascadingRoutes[result.score] = route;
+			}
 
-				//attach data to the UriData array
-				for(key in result.data) {
-					if(!result.data.hasOwnProperty(key)) { continue; }
-					routeUriData[key] = result.data[key];
-				}
+			//if the route has a better score than the last then
+			// replace it
+			if(result.score > lastRouteScore && !result.cascade) {
+				lastRouteScore = result.score;
 
-				//if the route cascades then keep it
-				if(result.score > 0 && result.cascade) {
-					cascadingRoutes[result.score] = {
-						"route": route,
-						"uriData": routeUriData
-					};
-				}
-
-				//if the route has a better score than the last then
-				// replace it
-				if(result.score > lastRouteScore && !result.cascade) {
-					lastRouteScore = result.score;
-					terminalRoute = {
-						"route": route,
-						"uriData": routeUriData
-					};
-				}
+				route.uriData = routeUriData;
+				terminalRoute = route;
 			}
 		}
 
@@ -416,13 +391,13 @@
 		if(typeof subjectUrl !== 'string') { throw new Error('Cannot compare urls. Subject url must be a string.'); }
 		if(typeof rules !== 'object') { rules = {}; }
 
-		DEBUG && console.log('');
-		DEBUG && console.log(modelUrl + ' <===> ' + subjectUrl);
+		debug && console.log('');
+		debug && console.log(modelUrl + ' <===> ' + subjectUrl);
 
 		//handle root
 		if(modelUris.length === 0 && subjectUris.length === 0) {
 			score += 5;
-			DEBUG && console.log('    ROOT MATCH');
+			debug && console.log('    ROOT MATCH');
 		}
 
 		//loop through the target uris and compare to the route urls counter part.
@@ -432,13 +407,13 @@
 			subjectUri = subjectUris[uI];
 			modelUri = modelUris[uI];
 
-			DEBUG && console.log('/' + (modelUri || '') + ' <-> ' + '/' + (subjectUri || ''));
+			debug && console.log('/' + (modelUri || '') + ' <-> ' + '/' + (subjectUri || ''));
 
 			//if no subject uri
 			if(!modelUri && subjectUri !== '.' && subjectUri !== '+' || !subjectUri) {
 				score = 0;
 				cascading = false;
-				DEBUG && console.log('    =0 | MISSING SEGMENT');
+				debug && console.log('    =0 | MISSING SEGMENT');
 				break;
 			}
 
@@ -446,7 +421,7 @@
 			if(subjectUri === modelUri) {
 				if(!rules.noDirect) {
 					score += 5;
-					DEBUG && console.log('    +5 | DIRECT MATCH');
+					debug && console.log('    +5 | DIRECT MATCH');
 				}
 			}
 
@@ -454,7 +429,7 @@
 			else if(subjectUri.substr(0, 1) === ':') {
 				if(!rules.noDynamic) {
 					score += 4;
-					DEBUG && console.log('    +4 | DYNAMIC MATCH');
+					debug && console.log('    +4 | DYNAMIC MATCH');
 				}
 
 				//save the route uri as the key and the target uri as the value for the callback
@@ -465,7 +440,7 @@
 			else if(subjectUri === '*') {
 				if(!rules.noWildCard) {
 					score += 3;
-					DEBUG && console.log('    +3 | WILDCARD MATCH');
+					debug && console.log('    +3 | WILDCARD MATCH');
 				}
 			}
 
@@ -474,7 +449,7 @@
 				if(!rules.noCascade) {
 					score += 2;
 					cascading = true;
-					DEBUG && console.log('    +2 | CASCADING CATCHALL MATCH');
+					debug && console.log('    +2 | CASCADING CATCHALL MATCH');
 				}
 				break;
 			}
@@ -483,7 +458,7 @@
 			else if(subjectUri === '+') {
 				if(!rules.noCatchall) {
 					score += 1;
-					DEBUG && console.log('    +1 | TERMINATING CATCHALL MATCH');
+					debug && console.log('    +1 | TERMINATING CATCHALL MATCH');
 				}
 				break;
 			}
@@ -491,13 +466,13 @@
 			//if there is no match at all
 			else {
 				score = 0;
-				DEBUG && console.log('    =0 | NO MATCH');
+				debug && console.log('    =0 | NO MATCH');
 				break;
 			}
 		}
 
-		DEBUG && console.log('  SCORE: ' + score + (cascading && ' & CASCADING' || ''));
-		DEBUG && console.log('');
+		debug && console.log('  SCORE: ' + score + (cascading && ' & CASCADING' || ''));
+		debug && console.log('');
 
 		return {
 			"score": score,
@@ -543,7 +518,7 @@
 	 * @param tearDownCallbacks (optional)
 	 */
 	function bindRoute(url, async, setupCallbacks, tearDownCallbacks) {
-		var matchedRoute, bindings, rGK, rI, enI, exI, uris, route, uI, api;
+		var matchedRoute, bindings, rGK, rI, uris, route, uI, api;
 
 		if(typeof setupCallbacks === 'function') { setupCallbacks = [setupCallbacks]; }
 		if(typeof tearDownCallbacks === 'function') { tearDownCallbacks = [tearDownCallbacks]; }
@@ -576,32 +551,27 @@
 		//clean the url
 		url = cleanUrl(url);
 
-		//if the url string is empty after being clean, asumen it was invalid and throw an exception
-		if(!url) { throw new Error('Url '); }
+		//if the url string is empty after being clean, assume it was invalid and throw an exception
+		if(!url) { throw new Error('Cannot bind route. Requires a valid route url string.'); }
 
 		//try and get the route if it already exists
 		matchedRoute = false;
-		for(rGK in routes) {
-			if(routes.hasOwnProperty(rGK)) {
-				for(rI = 0; rI < routes[rGK].length; rI += 1) {
-					if(routes[rGK][rI].url === url) {
-						matchedRoute = routes[rGK][rI];
-					}
-				}
+		for(rI = 0; rI < routes.length; rI += 1) {
+			if(routes[rI].url === url) {
+				matchedRoute = routes[rI];
+				break;
 			}
 		}
 
 		//if an existing route has been setup already then add the new callbacks to it
 		if(matchedRoute) {
 
-			//add the setup callbacks
-			for(enI = 0; enI < setupCallbacks.length; enI += 1) {
-				matchedRoute.setupCallbacks.push(setupCallbacks[enI]);
-			}
-			//add the tear down
-			for(exI = 0; exI < tearDownCallbacks.length; exI += 1) {
-				matchedRoute.tearDownCallbacks.push(tearDownCallbacks[exI]);
-			}
+			matchedRoute.bindings.push({
+				"async": async,
+				"active": false,
+				"setupCallbacks": setupCallbacks,
+				"tearDownCallbacks": tearDownCallbacks
+			});
 
 		//if no existing route has benn setup then create a new route
 		} else {
@@ -609,18 +579,18 @@
 			//pull out the route's uris
 			uris = urlToUris(url);
 
-			//if the routes object does not already have a route group for this number of uris then create it
-			if(!routes[uris.length]) { routes[uris.length] = []; }
-
 			//create the route
 			route = {
 				"url": url,
-				"setupCallbacks": setupCallbacks,
-				"tearDownCallbacks": tearDownCallbacks,
-				"async": async
+				"bindings": [{
+					"async": async,
+					"active": false,
+					"setupCallbacks": setupCallbacks,
+					"tearDownCallbacks": tearDownCallbacks
+				}]
 			};
 
-			routes[uris.length].push(route);
+			routes.push(route);
 		}
 
 		handleCurrentRoute();
@@ -839,7 +809,7 @@
 	 * @param url
 	 * @param forceNewTab
 	 */
-	function go(url, forceNewTab) {
+	function go(url, routesOnly) {
 
 		//if a url is given
 		if(typeof url === 'string') {
@@ -850,18 +820,10 @@
 
 			//if the url is relative to the domain
 			} else {
-				if(getRoutes(url) || getPointer(url)) {
-					if(forceNewTab) {
-						open(location.pathname + '#' + url, '_blank');
-					} else {
-						location.hash = url;
-					}
+				if(getRoutes(url) || getPointer(url) || routesOnly) {
+					open(location.pathname + '#' + url, '_blank');
 				} else {
-					if(forceNewTab) {
-						open(url, '_blank');
-					} else {
-						location = url;
-					}
+					window.location = url;
 				}
 			}
 
