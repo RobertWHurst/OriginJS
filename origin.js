@@ -807,7 +807,7 @@
 	/**
 	 * Accepts absolute urls as well as relative urls and hash urls that are in the routing table.
 	 * @param url
-	 * @param forceNewTab
+	 * @param routesOnly
 	 */
 	function go(url, routesOnly) {
 
@@ -821,9 +821,9 @@
 			//if the url is relative to the domain
 			} else {
 				if(getRoutes(url) || getPointer(url) || routesOnly) {
-					open(location.pathname + '#' + url, '_blank');
+					window.location.hash = url;
 				} else {
-					window.location = url;
+					open(location.pathname + '#' + url, '_blank');
 				}
 			}
 
