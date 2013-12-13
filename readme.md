@@ -4,7 +4,7 @@ Every route begins with an origin.
 
 Introduction
 ============
-OriginJS is am awesome clent slide router. It's lightweight, easy to use, and has a lot of very powerful features.
+OriginJS is an awesome clent slide router. It's lightweight, easy to use, and has a lot of very powerful features.
 If your building a single page application, and javascript game, or anything else heavy in javascript, OriginJS will
 make your application more accessable and might even help you code in a more organized way.
 
