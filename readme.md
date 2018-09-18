@@ -4,9 +4,9 @@ Every route begins with an origin.
 
 Introduction
 ============
-OriginJS is an awesome clent slide router. It's lightweight, easy to use, and has a lot of very powerful features.
-If your building a single page application, and javascript game, or anything else heavy in javascript, OriginJS will
-make your application more accessable and might even help you code in a more organized way.
+OriginJS is an awesome client side router. It's lightweight, easy to use, and has a lot of very powerful features.
+If you're building a single page application, and javascript game, or anything else heavy in javascript, OriginJS will
+make your application more accessible and might even help you code in a more organized way.
 
 
 Documentation
@@ -17,9 +17,9 @@ Bind
 
     OriginJS.bind(route, setupCallback(urisArray, previousUrisArray)[, tearDownCallback(urisArray, previousUrisArray)]);
 
-This method is the corner stone of this library. It binds your route logic to the routes of your application. To bind a
+This method is the cornerstone of this library. It binds your route logic to the routes of your application. To bind a
 route you simply call `OriginJS.bind()` passing it a route (like /home, /about, etc...), and a setup callback that will
-load the content of your route. You can optionally pass a teardown callback aswell if you wish to cleanup your loaded
+load the content of your route. You can optionally pass a teardown callback as well if you wish to cleanup your loaded
 content when a different route is followed. You can think of `setupCallback()` and `tearDownCallback()` as parellels to the
 DOM's `onload` and `onunload` events.
 
@@ -27,7 +27,7 @@ DOM's `onload` and `onunload` events.
 
 - `route`: A route string or an array of route strings. The route can contain dynamic uris such as `*`, `+`, or `:someIdHere`.
 - `setupCallback`: A function or array of functions that will be called when the route is followed.
-- `tearDownCallback`: Optional. A function or array of functions that will be called when the navigating way from the route.
+- `tearDownCallback`: Optional. A function or array of functions that will be called when navigating away from the route.
 
 Both the `setupCallback()` and the `tearDownCallback()` are passed two arguments; A uris array for the current route,
 and a uris array from the route followed prior to the current.
@@ -40,7 +40,7 @@ to `/home/cake` the uri array would be `['home', 'cake']`.
 
 - `*`: Wildcard uris will match any uri.
 - `:[name]`: Dynamic uris are a colon followed by a key name. Examples `:key`, `:user`, `:cake`. Dynaimc uris will capture
-the value of the uri they match and attach it the the uris array as a keyed value. `:key` becomes `urisArray.key`,
+the value of the uri they match and attach it to the uris array as a keyed value. `:key` becomes `urisArray.key`,
 `:user` becomes `urisArray.user`, `:cake` becomes `urisArray.cake`.
 - `+`: Catchall uris will match any uri and anything that follows it. It can be used to setup things like 404 pages and
 other types of catchall pages.
@@ -64,8 +64,8 @@ Update
 
 	OriginJS.update();
 
-The `OriginJS.update()` method is used to trigger force Origin to match the current hash url routes are defined. You should
-call this after your routes are binded in your appication. You should only need to to call this function once.
+The `OriginJS.update()` method is used to trigger force Origin to match the current hash url routes which are defined. You should
+call this after your routes are binded in your appication. You should only need to call this function once.
 
 Point
 -----
@@ -73,8 +73,8 @@ Point
 	OriginJS.point(route[, ...]).to(route)
 	OriginJS.point(route[, ...]).at(route)
 
-At some point you may want to setup aliases or redirects. `OriginJS.point()` creates aliases and redrects with ease. It
-takes any number route strings. and returns an object with two functions. These functions are `at()` and `to()`.
+At some point you may want to setup aliases or redirects. `OriginJS.point()` creates aliases and redirects with ease. It
+takes any number of route strings, and returns an object with two functions. These functions are `at()` and `to()`.
 
 - `at(route)`: Creates an alias from the routes passed to `point()` and points them to a `route` passed.
 - `to(route)`: Creates a redirect from the routes passed to `point()` and forwards them to a `route` passed.
